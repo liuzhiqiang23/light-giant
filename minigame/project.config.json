@@ -1,0 +1,12 @@
+{
+  "description": "光之巨人·方块世界 微信小游戏",
+  "appid": "touristappid",
+  "compileType": "game",
+  "projectname": "light-giant-minigame",
+  "libVersion": "latest",
+  "setting": {
+    "es6": true,
+    "minified": false,
+    "urlCheck": false
+  }
+}

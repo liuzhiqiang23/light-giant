@@ -1,0 +1,3288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>光之巨人 · 方块世界</title>
+<style>
+  html,body{margin:0;padding:0;overflow:hidden;background:#000;height:100%;font-family:"Microsoft YaHei",sans-serif;user-select:none}
+  #c{display:block;width:100%;height:100%}
+  .hud{position:fixed;pointer-events:none;color:#fff;text-shadow:0 1px 3px #000;z-index:10}
+  #cross{left:50%;top:50%;transform:translate(-50%,-50%);font-size:22px;color:rgba(255,255,255,.85)}
+  #stats{left:14px;top:12px;font-size:14px;line-height:22px}
+  #hearts{font-size:18px;letter-spacing:2px}
+  #energyWrap{width:180px;height:14px;background:rgba(0,0,0,.55);border:1px solid #9adcf0;border-radius:7px;margin-top:6px;overflow:hidden}
+  #energyBar{height:100%;width:0%;background:linear-gradient(90deg,#19c8ff,#aef4ff);transition:width .2s}
+  #energyTxt{font-size:12px;color:#9adcf0;margin-top:3px}
+  #clock{right:14px;top:12px;text-align:right;font-size:14px;line-height:22px}
+  #hotbar{left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:6px}
+  .slot{width:52px;height:52px;background:rgba(0,0,0,.5);border:2px solid #555;border-radius:6px;position:relative}
+  .slot.sel{border-color:#ffd75e;box-shadow:0 0 10px #ffd75e88}
+  .slot canvas{width:100%;height:100%;image-rendering:pixelated;border-radius:4px}
+  .slot .cnt{position:absolute;right:3px;bottom:1px;font-size:12px;color:#fff;text-shadow:0 1px 2px #000}
+  .slot .key{position:absolute;left:4px;top:1px;font-size:10px;color:#ccc}
+  #hint{left:50%;bottom:76px;transform:translateX(-50%);font-size:12px;color:rgba(255,255,255,.75);background:rgba(0,0,0,.35);padding:4px 12px;border-radius:10px}
+  #dmgFlash{position:fixed;inset:0;box-shadow:inset 0 0 140px rgba(255,30,30,.85);opacity:0;pointer-events:none;z-index:9}
+  #hpNum{font-size:15px;font-weight:bold;color:#fff;margin-left:6px}
+  #stats{transition:transform .15s}
+  #stats.low #hearts{animation:hpPulse .9s infinite}
+  @keyframes hpPulse{0%,100%{opacity:1}50%{opacity:.3}}
+  #dmgNum{position:fixed;left:50%;top:34%;transform:translateX(-50%);font-size:30px;font-weight:bold;color:#ff4b4b;text-shadow:0 2px 8px #000;z-index:11;pointer-events:none;opacity:0}
+  #transTimer{left:50%;top:16%;transform:translateX(-50%);font-size:26px;color:#ff5b5b;font-weight:bold;display:none}
+  .overlay{position:fixed;inset:0;background:rgba(5,8,18,.86);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;z-index:20}
+  .overlay h1{font-size:42px;margin:0 0 8px;color:#aef4ff;text-shadow:0 0 24px #19c8ff}
+  .overlay h2{font-size:20px;margin:0 0 22px;color:#ffd75e;font-weight:normal}
+  .overlay p{font-size:14px;line-height:2;color:#cfe6ff;margin:4px 0}
+  .overlay .btn{margin-top:26px;padding:12px 44px;font-size:18px;background:linear-gradient(135deg,#19c8ff,#7b5cff);color:#fff;border:none;border-radius:24px;cursor:pointer}
+  .overlay .btn:hover{filter:brightness(1.15)}
+  #death{display:none}
+  #death h1{color:#ff5b5b;text-shadow:0 0 24px #f00}
+  .tag{display:inline-block;background:#16324a;padding:1px 8px;border-radius:8px;margin:0 2px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="hud" id="cross">+</div>
+<div id="dmgFlash"></div>
+<div id="dmgNum"></div>
+<div class="hud" id="stats">
+  <div id="hearts"></div><span id="hpNum">20/20</span>
+  <div id="energyWrap"><div id="energyBar"></div></div>
+  <div id="energyTxt">能量 0/6（击败怪兽充能）</div>
+  <div id="weaponTxt" style="font-size:13px;color:#ffd75e;margin-top:2px">👊 拳模式（按 G 换机枪）</div>
+</div>
+<div class="hud" id="clock"></div>
+<div class="hud" id="transTimer"></div>
+<div class="hud" id="sanctTip" style="left:50%;top:15%;transform:translateX(-50%);display:none;color:#ffe9b0;text-shadow:0 0 12px #ffb400,0 1px 3px #000">✦ 圣域庇护 · 怪兽不敢踏足神殿 ✦</div>
+<div class="hud" id="hotbar"></div>
+<div class="hud" id="hint">左键 破坏/攻击(巨人:锁定目标) · 右键 放置 · G 机枪 · T 变身 · F 点按黄色能量炮弹(左右手交替)/长按2秒红色双手粗激光 · V 巨人飞踢(点按快踢/按住蓄力·无敌) · R 拳击三连段(巨人) · B 巨大化(巨人,比超级巨兽更大) · 巨人:空格飞/C降 · 夜晚战损黎明自动复原 · 神殿光阵站定2秒：升天堂/回地面 · M 静音 · Esc暂停</div>
+<div class="hud" id="pauseTip" style="left:50%;top:44%;transform:translate(-50%,-50%);font-size:24px;background:rgba(5,8,18,.72);padding:20px 46px;border-radius:14px;display:none;text-align:center">⏸ 已暂停<br><span style="font-size:14px;color:#9adcf0">点击画面继续冒险</span></div>
+<div class="hud" id="bossDir" style="left:50%;top:50%;width:0;height:0;display:none;z-index:8">
+  <div id="bossArrow" style="position:absolute;left:0;top:0;font-size:32px;color:#ff4b4b;text-shadow:0 0 12px #ff2020;will-change:transform">▲</div>
+  <div id="bossTxt" style="position:absolute;left:0;top:44px;transform:translateX(-50%);font-size:12px;color:#ffb0a8;white-space:nowrap;text-shadow:0 1px 3px #000"></div>
+</div>
+<div class="hud" id="chargeBar" style="left:50%;top:56%;transform:translateX(-50%);width:150px;height:9px;background:rgba(0,10,20,.6);border:1px solid #36c6ff;border-radius:5px;display:none;overflow:hidden">
+  <div id="chargeFill" style="height:100%;width:0%;background:linear-gradient(90deg,#19c8ff,#aef4ff)"></div>
+</div>
+
+<div class="overlay" id="start">
+  <h1>光之巨人 · 方块世界</h1>
+  <h2>生存 · 建造 · 变身 · 讨伐怪兽</h2>
+  <p>白天采集方块、修筑庇护所；<span class="tag">夜晚</span>怪兽成群袭来</p>
+  <p>击败怪兽积攒能量，满 6 格按 <span class="tag">T</span> 化身光之巨人</p>
+  <p>巨人形态：<span class="tag">F</span> 点按=蓝色光线（左右手交替）· <span class="tag">长按F 2秒</span>=红色双手粗激光 · <span class="tag">V</span> 巨人飞踢（无敌）· <span class="tag">T</span> 切回</p>
+  <p>每第 3 个夜晚降临 <span class="tag">巨型Boss</span>，每第 5 夜降临 <span class="tag">超级巨兽</span>（4倍体型·300血）</p>
+  <p>高空之上有 <span class="tag">上界天堂</span>：变身飞上去，水晶树与光铃花间栖居着奇珍异兽</p>
+  <p>草原上有花丛灌木与兔鹿小动物，四处云海翻腾</p>
+  <button class="btn" id="btnStart">进入世界</button>
+  <button class="btn" id="btnReset" style="display:none;margin-top:14px;padding:8px 28px;font-size:14px;background:#39424e">🗑 重开新世界（清除存档）</button>
+</div>
+
+<div class="overlay" id="death">
+  <h1>你被怪兽击败了</h1>
+  <p id="deathStats"></p>
+  <button class="btn" onclick="location.reload()">重新开始</button>
+</div>
+
+<script src="three.min.js"></script>
+<script>
+window.__err = '';
+window.addEventListener('error', e => { window.__err = (e.message||'') + ' @' + (e.lineno||'?'); });
+</script>
+<script>
+/* =========================================================
+ * 光之巨人 · 方块世界  —— 3D 体素生存原型（H5 版）
+ * 零外部素材：方块贴图 / 人物 / 怪兽全部程序化生成
+ * 结构对齐微信小游戏移植：World / Player / Monster / HUD
+ * ========================================================= */
+(function(){
+'use strict';
+
+/* ---------- 基础常量 ---------- */
+const WORLD = 512;         // 岛屿边长（格）—— 256→512，面积再 ×4
+const HEIGHT = 128;        // 世界高（上方留给上界天堂）
+const WATER = 10;          // 海平面（低于此高度铺沙）
+const DAY_LEN = 240;       // 一昼夜秒数（白天120 夜晚120）——比旧版长一倍
+const MAX_MON = 7;         // 夜间怪兽同时在场上限
+const ENERGY_MAX = 6;      // 变身所需能量
+const SAVE_KEY = 'lightgiant_save_v3';
+const VIEW = 280;          // 区块裁剪上限（实际跟随雾距：min(雾距+10, 280)）
+const HEAVEN_Y = 86;       // 上界天堂基准高度（浮空岛群）
+
+const BLOCK = {AIR:0, GRASS:1, DIRT:2, STONE:3, WOOD:4, LEAF:5, SAND:6, LITE:7, SNOW:8,
+  TGRASS:9, FLR:10, FLY:11, SHRUB:12, BELL:13,           // 地表花草灌木（十字面片，非实体）
+  CSTONE:14, HGRASS:15, CRYSTAL:16, LWOOD:17,            // 上界：云石/圣草/水晶/圣木
+  CACTUS:18};                                            // 沙漠仙人掌
+// 名称 / 可放置列表（热栏顺序）
+const PLACEABLE = [BLOCK.GRASS, BLOCK.DIRT, BLOCK.STONE, BLOCK.WOOD, BLOCK.LEAF, BLOCK.SAND, BLOCK.LITE, BLOCK.SNOW];
+const SOLID = new Set([1,2,3,4,5,6,7,8,14,15,16,17,18]);
+const PLANTS = new Set([9,10,11,12,13]);                 // 花草：可打掉、不挡路不遮挡
+
+/* ---------- 程序化像素贴图（16×16，含草尖/裂纹/波纹/木结/孔洞等细节） ---------- */
+function makeTex(base, speck, opts){
+  opts = opts || {};
+  const cv = document.createElement('canvas'); cv.width = cv.height = 16;
+  const g = cv.getContext('2d');
+  g.fillStyle = base; g.fillRect(0,0,16,16);
+  let seed = opts.seed || 7;
+  const rnd = () => (seed = (seed*16807)%2147483647) / 2147483647;
+  for (let i=0;i<(opts.dots||70);i++){
+    g.fillStyle = rnd()<.5 ? speck : shade(base, (rnd()-.5)*.25);
+    g.fillRect((rnd()*16)|0, (rnd()*16)|0, 1, 1);
+  }
+  if (opts.blades) for (let i=0;i<10;i++){                    // 草地：亮色草尖竖点
+    g.fillStyle = shade(base, .24);
+    g.fillRect((rnd()*16)|0, (rnd()*8)|0, 1, 2);
+  }
+  if (opts.cracks){                                            // 石材：深色短裂纹 + 碎亮点
+    g.fillStyle = shade(base, -.32);
+    for (let i=0;i<4;i++){ const x=(rnd()*13)|0, y=(rnd()*12)|0;
+      g.fillRect(x, y, 1, 3); g.fillRect(x+1, y+2, 2, 1); }
+    g.fillStyle = shade(base, .2);
+    for (let i=0;i<8;i++) g.fillRect((rnd()*16)|0, (rnd()*16)|0, 1, 1);
+  }
+  if (opts.ripple) for (const y of [3,8,13]){                  // 沙丘：浅色波纹
+    g.fillStyle = shade(base, .13);
+    for (let x=0;x<16;x++) if ((x+y)%5<3) g.fillRect(x, y + ((x/5)|0)%2, 1, 1);
+  }
+  if (opts.knots){                                             // 木头：结疤 + 高光
+    g.fillStyle = shade(base, -.3);
+    g.fillRect(4,5,2,2); g.fillRect(11,10,2,2);
+    g.fillStyle = shade(base, .14); g.fillRect(4,7,2,1); g.fillRect(11,12,2,1);
+  }
+  if (opts.sparkle){                                           // 雪/水晶：闪点
+    g.fillStyle = '#ffffff';
+    for (let i=0;i<9;i++) g.fillRect((rnd()*16)|0, (rnd()*16)|0, 1, 1);
+  }
+  if (opts.holes){                                             // 树叶：深色透光孔
+    g.fillStyle = shade(base, -.4);
+    for (let i=0;i<9;i++) g.fillRect((rnd()*15)|0, (rnd()*15)|0, 2, 1);
+  }
+  if (opts.stripe){ // 木纹竖条
+    for (let x=0;x<16;x+=4){ g.fillStyle = shade(base,-.18); g.fillRect(x,0,1,16); }
+  }
+  if (opts.cross){ // 光石十字纹
+    g.fillStyle = '#fff2b8'; g.fillRect(3,3,10,10);
+    g.fillStyle = base; g.fillRect(5,5,6,6);
+    g.fillStyle = '#fff2b8'; g.fillRect(7,2,2,12); g.fillRect(2,7,12,2);
+  }
+  /* 微倒角：上沿亮/下沿暗/右缘微暗 —— 方块衔接出立体感的关键细节 */
+  g.fillStyle = shade(base,.1); g.fillRect(0,0,16,1);
+  g.fillStyle = shade(base,-.15); g.fillRect(0,15,16,1);
+  g.fillStyle = shade(base,-.07); g.fillRect(15,0,1,16);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestMipmapLinearFilter;             // 近处像素锐利、远处不再闪烁噪点
+  return {tex, cv};
+}
+function shade(hex, k){
+  const n = parseInt(hex.slice(1),16);
+  let r=(n>>16)&255, g=(n>>8)&255, b=n&255;
+  r=Math.max(0,Math.min(255,r+r*k|0)); g=Math.max(0,Math.min(255,g+g*k|0)); b=Math.max(0,Math.min(255,b+b*k|0));
+  return `rgb(${r},${g},${b})`;
+}
+const TEXS = {};
+TEXS[BLOCK.GRASS]=makeTex('#58a63c','#3f8a2c',{blades:true,seed:11});
+TEXS[BLOCK.DIRT ]=makeTex('#8a5a32','#6d4526',{dots:90,seed:22});
+TEXS[BLOCK.STONE]=makeTex('#8d8d94','#76767d',{cracks:true,dots:40,seed:33});
+TEXS[BLOCK.WOOD ]=makeTex('#6e4a1f','#5a3a15',{stripe:true,knots:true,seed:44,dots:30});
+TEXS[BLOCK.LEAF ]=makeTex('#3a8f3f','#2c7030',{holes:true,dots:50,seed:55});
+TEXS[BLOCK.SAND ]=makeTex('#d8c78a','#c4b175',{ripple:true,seed:66});
+TEXS[BLOCK.SNOW ]=makeTex('#eef4fa','#d5e3f2',{sparkle:true,dots:45,seed:88});
+TEXS[BLOCK.LITE ]=makeTex('#ffd75e','#f4bd32',{cross:true,seed:77,dots:40});
+TEXS[BLOCK.CSTONE]=makeTex('#e9edf4','#cdd6e4',{cracks:true,dots:35,seed:91});
+TEXS[BLOCK.HGRASS]=makeTex('#8fe8c4','#66d8a8',{blades:true,seed:92});
+TEXS[BLOCK.CRYSTAL]=makeTex('#8fe4ff','#c8f6ff',{sparkle:true,dots:90,seed:93});
+TEXS[BLOCK.LWOOD]=makeTex('#d9c693','#c2ad76',{stripe:true,knots:true,seed:94,dots:26});
+TEXS[BLOCK.CACTUS]=makeTex('#3f9a3a','#2f7a2c',{stripe:true,holes:true,seed:95,dots:18});
+/* 花草贴图：透明底像素画，配合 alphaTest 渲染成十字面片 */
+function makePlantTex(kind){
+  const cv = document.createElement('canvas'); cv.width = cv.height = 16;
+  const g = cv.getContext('2d');
+  let seed = 5; const rnd = () => (seed=(seed*16807)%2147483647)/2147483647;
+  const blade = (x,h,c)=>{ g.fillStyle=c; g.fillRect(x,16-h,1,h); };
+  if (kind===BLOCK.TGRASS){ for (let i=0;i<7;i++) blade(2+i*2, 5+((rnd()*8)|0), rnd()<.5?'#4fae35':'#3f8a2c'); }
+  if (kind===BLOCK.FLR || kind===BLOCK.FLY){
+    for (let i=0;i<4;i++) blade(4+i*2, 6+((rnd()*5)|0), '#3f8a2c');
+    const c = kind===BLOCK.FLR?['#ff5b5b','#ffd75e']:['#ffd75e','#ff9a3d'];
+    const x=6+((rnd()*3)|0), y=3+((rnd()*2)|0);
+    g.fillStyle=c[0]; g.fillRect(x,y,4,4); g.fillStyle=c[1]; g.fillRect(x+1,y+1,2,2);
+  }
+  if (kind===BLOCK.SHRUB){
+    g.fillStyle='#2c7030'; g.fillRect(3,8,10,8); g.fillStyle='#3a8f3f'; g.fillRect(4,7,8,6);
+    g.fillStyle='#1f5a24'; for (let i=0;i<8;i++) g.fillRect(3+((rnd()*10)|0), 8+((rnd()*7)|0), 1, 1);
+    g.fillStyle='#c94f4f'; for (let i=0;i<3;i++) g.fillRect(4+((rnd()*8)|0), 9+((rnd()*5)|0), 1, 1);
+  }
+  if (kind===BLOCK.BELL){
+    blade(7,9,'#bff1e4'); blade(9,7,'#a8e6d4');
+    g.fillStyle='#ff9ad5'; g.fillRect(5,3,5,5); g.fillStyle='#ffd7f0'; g.fillRect(6,4,3,3);
+    g.fillStyle='#fff'; g.fillRect(11,2,1,1); g.fillRect(3,6,1,1);
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
+  return {tex, cv};
+}
+TEXS[BLOCK.TGRASS]=makePlantTex(BLOCK.TGRASS);
+TEXS[BLOCK.FLR]=makePlantTex(BLOCK.FLR);
+TEXS[BLOCK.FLY]=makePlantTex(BLOCK.FLY);
+TEXS[BLOCK.SHRUB]=makePlantTex(BLOCK.SHRUB);
+TEXS[BLOCK.BELL]=makePlantTex(BLOCK.BELL);
+
+/* ---------- 程序合成音效（WebAudio，零素材；M 静音） ---------- */
+let actx = null, muted = false, noiseBuf = null;
+function ac(){
+  try{
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+  }catch(e){}
+  return actx;
+}
+/* 主音频总线：增益提亮 + 房间混响 + 压缩器——所有音效统一走这里（热门游戏的"声底"，懒建一次） */
+let masterBus = null;
+function audioBus(ctx){
+  if (masterBus) return masterBus;
+  masterBus = ctx.createGain(); masterBus.gain.value = 1.6;
+  const verb = ctx.createConvolver();                          // 合成房间混响：0.45s 指数衰减噪声脉冲响应
+  const ir = ctx.createBuffer(2, ctx.sampleRate*.45|0, ctx.sampleRate);
+  for (let ch=0;ch<2;ch++){
+    const d = ir.getChannelData(ch);
+    for (let i=0;i<d.length;i++) d[i] = (Math.random()*2-1)*Math.pow(1-i/d.length, 2.2);
+  }
+  verb.buffer = ir;
+  const wet = ctx.createGain(); wet.gain.value = .16;
+  const comp = ctx.createDynamicsCompressor();                 // 压缩器：大声不破、小声顶上来，整体更"满"
+  comp.threshold.value = -18; comp.ratio.value = 6;
+  masterBus.connect(comp);
+  masterBus.connect(wet); wet.connect(verb); verb.connect(comp);
+  comp.connect(ctx.destination);
+  return masterBus;
+}
+function sfxTone(f0, f1, dur, type, vol){
+  if (muted) return; const ctx = ac(); if (!ctx) return;
+  try{
+    const t0 = ctx.currentTime;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t0);
+    o.frequency.exponentialRampToValueAtTime(Math.max(20,f1), t0+dur);
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(.001, t0+dur);
+    o.connect(g).connect(audioBus(ctx)); o.start(t0); o.stop(t0+dur);
+  }catch(e){}
+}
+function sfxNoise(dur, vol, cutoff){
+  if (muted) return; const ctx = ac(); if (!ctx) return;
+  try{
+    if (!noiseBuf){
+      noiseBuf = ctx.createBuffer(1, ctx.sampleRate*.7|0, ctx.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i=0;i<d.length;i++) d[i] = Math.random()*2-1;
+    }
+    const t0 = ctx.currentTime;
+    const s = ctx.createBufferSource(); s.buffer = noiseBuf;
+    const f = ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value = cutoff;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(.001, t0+dur);
+    s.connect(f).connect(g).connect(audioBus(ctx)); s.start(t0); s.stop(t0+dur);
+  }catch(e){}
+}
+/* 连续激光音：长按F持续发射阶段的循环音（松开/中断即停） */
+let beamLoopNodes = null;
+function beamLoopStart(){
+  if (beamLoopNodes) return;
+  const ctx = ac(); if (!ctx || muted) return;
+  try{
+    const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), g = ctx.createGain();
+    const lfo = ctx.createOscillator(), lg = ctx.createGain();
+    o1.type='sawtooth'; o1.frequency.value=1500;
+    o2.type='sawtooth'; o2.frequency.value=2130;
+    lfo.type='sine'; lfo.frequency.value=14; lg.gain.value=240;       // 颤音增强"持续输出"感
+    lfo.connect(lg); lg.connect(o1.frequency); lg.connect(o2.frequency);
+    g.gain.value=.0001;
+    o1.connect(g); o2.connect(g); g.connect(audioBus(ctx));
+    o1.start(); o2.start(); lfo.start();
+    g.gain.setTargetAtTime(.13, ctx.currentTime, .06);
+    beamLoopNodes = {o1,o2,lfo,g};
+  }catch(e){}
+}
+function beamLoopStop(){
+  if (!beamLoopNodes) return;
+  try{
+    const n = beamLoopNodes;
+    n.g.gain.setTargetAtTime(.0001, ac().currentTime, .05);
+    setTimeout(()=>{ try{ n.o1.stop(); n.o2.stop(); n.lfo.stop(); }catch(e){} }, 350);
+  }catch(e){}
+  beamLoopNodes = null;
+}
+const SFX = {
+  shoot(){ sfxTone(1100, 300, .06, 'square', .1); sfxNoise(.05, .12, 3200); sfxTone(230, 90, .06, 'sine', .13); },   // 机枪：高频脆头+噪声+低频垫 三层
+  hit(){ sfxNoise(.06, .22, 2600); sfxTone(190, 60, .13, 'triangle', .3); },   // 命中怪兽：高频脆响+低频闷锤双层
+  kill(){ sfxTone(520, 55, .35, 'sawtooth', .18); sfxNoise(.22, .12, 1400); },
+  hurt(){ sfxTone(150, 55, .28, 'sawtooth', .3); },
+  breakB(){ sfxNoise(.13, .22, 900); sfxTone(320, 120, .08, 'square', .08); },
+  place(){ sfxTone(620, 480, .06, 'square', .12); },
+  punch(heavy){ heavy ? (sfxNoise(.16,.26,700), sfxTone(190,55,.18,'sine',.24)) : (sfxNoise(.1,.17,1400), sfxTone(420,130,.09,'sine',.13)); },   // 挥拳破空（上勾重拳低沉版）
+  giant(){ sfxTone(60, 260, .7, 'sawtooth', .3); sfxNoise(.55, .22, 500); sfxTone(1200, 280, .45, 'sine', .12); },   // 巨大化：低频轰鸣上升
+  transform(){                                                                 // 变身：圣光上升双和弦 + 七连碎钻闪烁 + 气流扫频
+    sfxTone(300, 1200, .9, 'sine', .22);
+    sfxTone(452, 1810, .9, 'sine', .12);
+    for (let i=0;i<7;i++) setTimeout(()=>sfxTone(880+i*190, 1320+i*190, .13, 'triangle', .07), 85*i);
+    sfxNoise(.8, .1, 3600);
+  },
+  revert(){ sfxTone(1200, 180, .5, 'sine', .22); },
+  beam(){ sfxTone(1900, 240, .5, 'sawtooth', .11); sfxTone(1855, 235, .5, 'sawtooth', .08); sfxNoise(.45, .08, 800); },  // 红激光：音量减半（.22/.15/.16→.11/.08/.08，用户反馈太响）
+  blast(){ sfxTone(950, 180, .14, 'square', .2); sfxNoise(.16, .24, 1600); sfxTone(140, 45, .22, 'sine', .34); },        // 能量炮：金属弹射+噪声爆裂+低频垫
+  boss(){ sfxTone(85, 55, .9, 'sawtooth', .32); sfxNoise(.8, .1, 300); },
+  echarge(){ sfxTone(160, 980, .5, 'sawtooth', .12); },                       // 敌方蓄能（走位窗口）
+  ebeam(){ sfxTone(1500, 90, .4, 'sawtooth', .2); sfxNoise(.35, .14, 900); }, // 敌方光束
+  charge(){ sfxTone(160, 1350, 2.0, 'sine', .14); },                          // 双手激光2秒蓄力音
+  kick(){ sfxNoise(.3, .3, 900); sfxTone(880, 140, .34, 'sawtooth', .22); sfxTone(1760, 2400, .12, 'sine', .1); },       // 起脚：破空+锐利锐鸣
+  anni(){ sfxTone(1900, 70, .45, 'sine', .16); },                             // 湮灭内爆
+  lock(){ sfxTone(1250, 880, .08, 'square', .14); sfxTone(1760, 1760, .06, 'sine', .1); }, // 锁定目标
+  boom(){ sfxNoise(.6, .5, 420); sfxNoise(.22, .3, 2400); sfxTone(150, 28, .65, 'sine', .6); },  // 爆炸：低频轰鸣+高频碎裂双噪声+次低音下坠
+  kcharge(){ sfxTone(140, 1500, 1.5, 'sawtooth', .12); },                     // 飞踢蓄力（1.5秒上扬，与F蓄力区分）
+  crack(){ sfxTone(2600, 200, .08, 'sawtooth', .18); sfxNoise(.2, .22, 4000); },  // 闪电劈裂
+  thunder(){ sfxNoise(1.1, .3, 260); sfxTone(75, 34, 1.1, 'sine', .4); },     // 雷声轰鸣
+  fly(){ sfxNoise(.18, .06, 500); },
+  jump(){ sfxTone(300, 520, .1, 'sine', .08); },
+};
+
+/* ---------- 场景 ---------- */
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});   // preserveDrawingBuffer 会禁用双缓冲，拖慢每帧渲染
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+const scene = new THREE.Scene();
+const skyC = new THREE.Color(0x9fd4ff);            // 天空色缓存（每帧 setRGB 复用）
+const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 600);
+scene.fog = new THREE.Fog(0x9fd4ff, 90, 240);
+const HEAVEN_FOG = new THREE.Color(0xfff2da);      // 上界高空暖雾
+const hemi = new THREE.HemisphereLight(0xcfe8ff, 0x61503a, 0.9); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff3d6, 1.0);
+sun.position.set(100, 160, 60); scene.add(sun);
+
+/* ---------- 地形生成 ---------- */
+function hash2(x, z){
+  // 必须用 Math.imul 精确 32 位乘法：普通乘法超出 2^53 后低位被舍入，
+  // 噪声值域会被压扁到 0.55 以下（草甸 pn>.62 永远为假的根因）
+  let h = (Math.imul(x,374761393) + Math.imul(z,668265263))|0;
+  h = Math.imul(h ^ (h>>>13), 1274126177);
+  return ((h ^ (h>>>16))>>>0)/4294967296;
+}
+function noise2(x, z){ // 值噪声平滑
+  const xi=Math.floor(x), zi=Math.floor(z), xf=x-xi, zf=z-zi;
+  const s=(t)=>t*t*(3-2*t);
+  const a=hash2(xi,zi), b=hash2(xi+1,zi), c=hash2(xi,zi+1), d=hash2(xi+1,zi+1);
+  return a+(b-a)*s(xf)+(c-a)*s(zf)+(a-b-c+d)*s(xf)*s(zf);
+}
+const vox = new Uint8Array(WORLD*HEIGHT*WORLD);
+const idx = (x,y,z)=> (y*WORLD + z)*WORLD + x;
+const inB = (x,y,z)=> x>=0 && x<WORLD && y>=0 && y<HEIGHT && z>=0 && z<WORLD;
+function getB(x,y,z){ return inB(x,y,z) ? vox[idx(x,y,z)] : BLOCK.AIR; }
+function setB(x,y,z,t){ if(inB(x,y,z)) vox[idx(x,y,z)] = t; }
+const hmap = new Int16Array(WORLD*WORLD); // 地表高度缓存（刷怪用）
+
+/* ---------- 地标选址：平坦度检查（顶层函数，加载旧存档后的地标升级也复用） ---------- */
+function flatSpot(wantR, salt, minD, usedSpots){
+  const cx = (WORLD-1)/2, cz = (WORLD-1)/2;
+  for (let tries=0; tries<500; tries++){
+    const x = 20+((hash2(tries*7+31+salt*97, 57+salt*31)*(WORLD-40))|0);
+    const z = 20+((hash2(tries*13+77+salt*53, 91+salt*13)*(WORLD-40))|0);
+    if (Math.hypot(x-cx, z-cz) < 30) continue;
+    if (usedSpots.some(u => Math.hypot(u[0]-x, u[1]-z) < (minD||34))) continue;
+    const h0 = hmap[x*WORLD+z];
+    if (h0<=WATER+2 || h0>30) continue;
+    let ok = true;
+    for (let dx=-wantR; dx<=wantR && ok; dx++) for (let dz=-wantR; dz<=wantR && ok; dz++)
+      if (Math.abs(hmap[(x+dx)*WORLD+(z+dz)]-h0)>1) ok = false;
+    if (ok){ usedSpots.push([x,z]); return {x, z, h:h0}; }
+  }
+  return null;
+}
+/* ---------- 宏伟宫殿：对称柱廊 + 发光窗 + 三重檐 + 四角塔楼 + 中央水晶塔（顶层函数，旧存档升级复用） ---------- */
+function clearRegion(x0,z0,x1,z1,yTop){
+  for (let x=x0;x<=x1;x++) for (let z=z0;z<=z1;z++)
+    for (let y=1;y<=yTop;y++) setB(x,y,z,BLOCK.AIR);
+}
+function buildGrandPalace(x, z, h){
+  clearRegion(x-8, z-7, x+8, z+7, h+14);
+  for (let dx=-8; dx<=8; dx++) for (let dz=-7; dz<=7; dz++){
+    const ring = Math.abs(dx)===8 || Math.abs(dz)===7;
+    setB(x+dx, h, z+dz, ring ? BLOCK.STONE : BLOCK.CSTONE);            // 石台基座+云石殿面
+    if (ring && (dx+dz)%2===0) setB(x+dx, h+1, z+dz, BLOCK.STONE);     // 台基城齿
+  }
+  for (let dz=-2; dz<=2; dz++){ setB(x-9, h, z+dz, BLOCK.STONE); setB(x-10, h, z+dz, BLOCK.STONE); }  // 西向大台阶
+  const wallX = 6, wallZ = 5;
+  for (let dx=-wallX; dx<=wallX; dx++) for (let dz=-wallZ; dz<=wallZ; dz++){
+    if (!(Math.abs(dx)===wallX || Math.abs(dz)===wallZ)) continue;
+    const col = (Math.abs(dx)===wallX && Math.abs(dz)===wallZ) || (Math.abs(dz)===wallZ && dx%3===0) || (Math.abs(dx)===wallX && dz%3===0);
+    for (let dy=1; dy<=5; dy++){
+      if (col){ setB(x+dx, h+dy, z+dz, BLOCK.CSTONE); continue; }      // 柱廊
+      const gate = (dz===wallZ && Math.abs(dx)<=1 && dy<=4);           // 南门拱洞
+      const win = (dy>=2 && dy<=3 && ((Math.abs(dz)===wallZ && dx%3!==0) || (Math.abs(dx)===wallX && dz%3!==0)));
+      setB(x+dx, h+dy, z+dz, gate ? BLOCK.AIR : (win ? BLOCK.LITE : BLOCK.CSTONE));   // 发光窗
+    }
+  }
+  for (const [px,pz] of [[-3,-2],[3,-2],[-3,2],[3,2]])                 // 内殿水晶柱
+    for (let dy=1; dy<=5; dy++) setB(x+px, h+dy, z+pz, dy%2 ? BLOCK.CRYSTAL : BLOCK.CSTONE);
+  setB(x, h, z, BLOCK.LITE);                                           // 殿心光石
+  for (const [tx,tz,y0] of [[8,6,6],[6,4,8],[4,2,10],[2,1,12]]){       // 三重檐（暖木檐口+云石翘角）
+    for (let dx=-tx; dx<=tx; dx++) for (let dz=-tz; dz<=tz; dz++){
+      const edge = Math.abs(dx)===tx || Math.abs(dz)===tz;
+      setB(x+dx, h+y0, z+dz, edge ? BLOCK.LWOOD : BLOCK.AIR);
+      if (edge && Math.abs(dx)===tx && Math.abs(dz)===tz) setB(x+dx, h+y0+1, z+dz, BLOCK.CSTONE);
+    }
+  }
+  for (let dy=6; dy<=12; dy++){                                        // 中央塔收分至水晶顶（塔芯中空：传送光束贯穿）
+    const t = dy<=10 ? 2 : 1;
+    for (let dx=-t; dx<=t; dx++) for (let dz=-t; dz<=t; dz++)
+      setB(x+dx, h+dy, z+dz, dy===12 ? BLOCK.CRYSTAL : BLOCK.CSTONE);
+    setB(x, h+dy, z, BLOCK.AIR);
+  }
+  setB(x, h+13, z, BLOCK.LITE);                                        // 塔顶光晶信标
+  for (const [sx,sz] of [[-1,-1],[1,-1],[-1,1],[1,1]]){                // 四角塔楼
+    const tx = sx*wallX, tz = sz*wallZ;
+    for (let dy=6; dy<=9; dy++) setB(x+tx, h+dy, z+tz, BLOCK.CSTONE);
+    setB(x+tx, h+10, z+tz, BLOCK.LWOOD);
+    setB(x+tx, h+11, z+tz, BLOCK.LITE);
+  }
+  for (let dz=wallZ+1; dz<=wallZ+4; dz++){ setB(x, h, z+dz, BLOCK.CSTONE); setB(x, h+1, z+dz, BLOCK.LITE); }  // 前庭光径
+}
+
+/* ---------- 圣域与夜灯：神殿范围内怪兽不敢靠近攻击；宫殿暖光/圣水辉光随夜色渐亮 ---------- */
+const sanctuaries = [];                                          // {x,z,r} 神殿圣域（怪兽止步圈）
+const nightLights = [];                                          // {L,base} 常驻夜灯：白天熄灭，入夜渐亮
+const glowMats = [];                                             // {mat,base} 夜光材质（圣水/水雾/水潭）
+const nightOpas = [];                                            // {mat,base} 夜间才显形的加法光晕（不占灯光）
+function inSanctuary(x, z){
+  for (const s of sanctuaries){ const dx=x-s.x, dz=z-s.z; if (dx*dx+dz*dz < s.r*s.r) return s; }
+  return null;
+}
+function addNightLight(x, y, z, color, base, dist){
+  const L = new THREE.PointLight(color, 0, dist);
+  L.position.set(x, y, z); scene.add(L);
+  nightLights.push({L, base});
+}
+function registerPalaceAmbience(x, z, h){
+  if (sanctuaries.some(s=>s.x===x && s.z===z)) return;
+  sanctuaries.push({x, z, r:22, h});
+  addNightLight(x, h+5.5, z, 0xffd9a0, 1.5, 32);                 // 庭院暖光：柱廊/发光窗/前庭
+  addNightLight(x, h+13.5, z, 0xffe2b0, 1.1, 20);                // 塔顶信标：三重檐与水晶塔尖
+}
+
+/* ---------- 天地传送阵：神殿光柱贯穿两界，站定蓄力 2 秒互传（地↔天同址一一对应） ---------- */
+const TP_TIME = 2.0;                                             // 传送蓄力秒数
+const tpLinks = [];                                              // {x,z,gh,hy,beamMats,ringMats,flash}
+let tpCharge = 0, tpLink = null, tpLockL = null;                 // tpLockL: 刚传送到达的阵——踏出前不再触发（防乒乓）
+function heavenSurfaceY(x, z){                                   // 天堂岛面高度（含已建圣殿的地坪）
+  for (let y=HEAVEN_Y+18; y>=HEAVEN_Y-8; y--){
+    const b = getB(x,y,z);
+    if (b===BLOCK.HGRASS || b===BLOCK.CSTONE) return y;
+  }
+  return null;
+}
+function stampTpPad(bx, bz, by){                                 // 3×3 水晶光阵（中心光石）
+  for (let dx=-1; dx<=1; dx++) for (let dz=-1; dz<=1; dz++)
+    setB(bx+dx, by, bz+dz, (dx===0 && dz===0) ? BLOCK.LITE : BLOCK.CRYSTAL);
+}
+function buildHeavenIsle(bx, bz, py){                            // 无岛处补浮空岛盘（下收分显浮岛感）
+  for (let dx=-9; dx<=9; dx++) for (let dz=-8; dz<=8; dz++){
+    setB(bx+dx, py, bz+dz, BLOCK.CSTONE);
+    if (Math.abs(dx)<7 && Math.abs(dz)<6) setB(bx+dx, py-1, bz+dz, BLOCK.CSTONE);
+    if (Math.abs(dx)<4 && Math.abs(dz)<3) setB(bx+dx, py-2, bz+dz, BLOCK.CSTONE);
+  }
+}
+function buildHeavenPalace(x, z, py){                            // 天界圣殿：与地面神殿同址同轴，水晶圣殿更晶莹
+  for (let dx=-9; dx<=9; dx++) for (let dz=-8; dz<=8; dz++)       // 只清殿址上空——绝不触碰下方地形（clearRegion 会凿穿两界！）
+    for (let y=py+1; y<=py+16; y++) setB(x+dx, y, z+dz, BLOCK.AIR);
+  for (let dx=-9; dx<=9; dx++) for (let dz=-8; dz<=8; dz++){
+    const ring = Math.abs(dx)===9 || Math.abs(dz)===8;
+    setB(x+dx, py, z+dz, ring ? BLOCK.CRYSTAL : BLOCK.CSTONE);   // 台面水晶镶边
+    if (ring && (dx+dz)%2===0) setB(x+dx, py+1, z+dz, BLOCK.CRYSTAL);                   // 缘栏珠串
+    if (ring && hash2(x+dx*3, z+dz*7)>.42) setB(x+dx, py-1, z+dz, BLOCK.CSTONE);        // 底裙垂檐
+  }
+  for (const [cx,cz] of [[-9,-8],[9,-8],[-9,8],[9,8]])           // 四角晶柱头
+    for (let dy=1; dy<=2; dy++) setB(x+cx, py+dy, z+cz, BLOCK.CRYSTAL);
+  const wallX=6, wallZ=5;
+  for (let dx=-wallX; dx<=wallX; dx++) for (let dz=-wallZ; dz<=wallZ; dz++){
+    if (!(Math.abs(dx)===wallX || Math.abs(dz)===wallZ)) continue;
+    const col = (Math.abs(dx)===wallX && Math.abs(dz)===wallZ) || (Math.abs(dz)===wallZ && dx%3===0) || (Math.abs(dx)===wallX && dz%3===0);
+    for (let dy=1; dy<=7; dy++){
+      if (col){ setB(x+dx, py+dy, z+dz, dy%2 ? BLOCK.CSTONE : BLOCK.CRYSTAL); continue; } // 水晶缠柱
+      const gate = (dz===wallZ && Math.abs(dx)<=2 && dy<=5);     // 南门拱洞（更宽）
+      const win = (dy>=2 && dy<=5 && ((Math.abs(dz)===wallZ && dx%3!==0) || (Math.abs(dx)===wallX && dz%3!==0)));
+      setB(x+dx, py+dy, z+dz, gate ? BLOCK.AIR : (win ? BLOCK.LITE : BLOCK.CSTONE));      // 双层发光长窗
+    }
+  }
+  for (const [px,pz] of [[-3,-2],[3,-2],[-3,2],[3,2]])           // 内殿通天水晶柱
+    for (let dy=1; dy<=7; dy++) setB(x+px, py+dy, z+pz, BLOCK.CRYSTAL);
+  for (const [tx,tz,y0] of [[8,7,8],[6,5,10],[4,3,12],[2,1,14]]){     // 三重飞檐+顶檐（金木檐口+晶翘角）
+    for (let dx=-tx; dx<=tx; dx++) for (let dz=-tz; dz<=tz; dz++){
+      const edge = Math.abs(dx)===tx || Math.abs(dz)===tz;
+      setB(x+dx, py+y0, z+dz, edge ? BLOCK.LWOOD : BLOCK.AIR);
+      if (edge && Math.abs(dx)===tx && Math.abs(dz)===tz) setB(x+dx, py+y0+1, z+dz, BLOCK.CRYSTAL);
+    }
+  }
+  for (let dy=8; dy<=14; dy++){                                  // 中央水晶塔（塔芯中空容光贯穿）
+    const t = dy<=12 ? 2 : 1;
+    for (let dx=-t; dx<=t; dx++) for (let dz=-t; dz<=t; dz++) setB(x+dx, py+dy, z+dz, BLOCK.CRYSTAL);
+    setB(x, py+dy, z, BLOCK.AIR);
+  }
+  setB(x, py+15, z, BLOCK.LITE);                                 // 塔顶光晶信标
+  for (const [sx,sz] of [[-1,-1],[1,-1],[-1,1],[1,1]]){          // 四角晶塔
+    const tx = sx*wallX, tz = sz*wallZ;
+    for (let dy=8; dy<=11; dy++) setB(x+tx, py+dy, z+tz, BLOCK.CSTONE);
+    setB(x+tx, py+12, z+tz, BLOCK.CRYSTAL);
+    setB(x+tx, py+13, z+tz, BLOCK.LITE);
+  }
+  for (let dx=-9; dx<=9; dx++) for (let dz=-8; dz<=8; dz++)      // 台缘光铃花
+    if ((Math.abs(dx)===9 || Math.abs(dz)===8) && hash2(x*7+dx, z*7+dz)>.78 && getB(x+dx, py+1, z+dz)===BLOCK.AIR)
+      setB(x+dx, py+1, z+dz, BLOCK.BELL);
+  stampTpPad(x, z, py+1);                                        // 圣殿中央传送阵
+}
+function buildTeleporters(){                                     // 每次启动：补建阵体（体素）+ 重建光束（网格）
+  let changed = false;
+  for (const s of sanctuaries){
+    const gh = s.h, x = s.x, z = s.z;
+    const ghOk = getB(x, gh, z)===BLOCK.LITE && getB(x-8, gh, z)===BLOCK.STONE && getB(x+8, gh, z)===BLOCK.STONE;
+    if (!ghOk){
+      // 自愈：旧版天界圣殿清场曾把地面神殿连同立柱凿穿成井——回填立井并重建地面神殿
+      for (let dx=-9; dx<=9; dx++) for (let dz=-8; dz<=8; dz++){
+        for (let y=1; y<gh; y++) if (getB(x+dx, y, z+dz)===BLOCK.AIR) setB(x+dx, y, z+dz, BLOCK.STONE);
+        if ((Math.abs(dx)>8 || Math.abs(dz)>7) && getB(x+dx, gh, z+dz)===BLOCK.AIR) setB(x+dx, gh, z+dz, BLOCK.GRASS);
+      }
+      buildGrandPalace(x, z, gh);
+      for (let dx=-8; dx<=8; dx++) for (let dz=-7; dz<=7; dz++)  // 重建的 clearRegion 又清空了殿底——再补实一次
+        for (let y=1; y<gh; y++) if (getB(x+dx, y, z+dz)===BLOCK.AIR) setB(x+dx, y, z+dz, BLOCK.STONE);
+      changed = true;
+    } else {
+      for (let dx=-8; dx<=8; dx++) for (let dz=-7; dz<=7; dz++)  // 补实殿底空洞（防坠落被困）
+        for (let y=1; y<gh; y++) if (getB(x+dx, y, z+dz)===BLOCK.AIR){ setB(x+dx, y, z+dz, BLOCK.STONE); changed = true; }
+    }
+    if (getB(x, gh+1, z) !== BLOCK.LITE){ stampTpPad(x, z, gh+1); changed = true; }      // 地面神殿中央光阵
+    let hy = heavenSurfaceY(x, z);
+    if (hy === null){ buildHeavenIsle(x, z, HEAVEN_Y); hy = HEAVEN_Y; changed = true; }  // 岛链空洞处补浮岛
+    if (getB(x, hy, z)!==BLOCK.CSTONE || getB(x, hy+1, z)!==BLOCK.LITE || getB(x+6, hy, z)!==BLOCK.CSTONE){
+      buildHeavenPalace(x, z, hy); changed = true;               // 天界圣殿缺失则建（同址对应）
+    }
+    addNightLight(x+.5, hy+6.5, z+.5, 0xbfe8ff, 1.4, 30);        // 天界圣殿殿内冷光：穿窗照亮水晶缠柱与殿心
+    const halo = new THREE.Mesh(new THREE.CircleGeometry(14, 24), // 殿基光环：整座圣殿像浮在一盘微光上
+      new THREE.MeshBasicMaterial({color:0x8fd4ff, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false, fog:false}));
+    halo.rotation.x = -Math.PI/2; halo.position.set(x+.5, hy+1.06, z+.5);
+    scene.add(halo); nightOpas.push({mat:halo.material, base:.2});
+    const H = hy - gh + 2.5;                                     // 贯穿两界的光束（网格装饰，每次启动重建）
+    const bg = new THREE.Group();
+    const beamMats = [];
+    for (const [r, op] of [[.62, .17], [.3, .38]]){
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, H, 10, 1, true),
+        new THREE.MeshBasicMaterial({color:0x9fd8ff, transparent:true, opacity:op, blending:THREE.AdditiveBlending, depthWrite:false, fog:false, side:THREE.DoubleSide}));
+      m.position.y = H/2; bg.add(m); beamMats.push({mat:m.material, base:op});
+    }
+    bg.position.set(x+.5, gh+1, z+.5); scene.add(bg);
+    const ringMats = [];
+    for (const py of [gh+2.06, hy+2.06]){                        // 两界光阵地面光环
+      const rm = new THREE.Mesh(new THREE.CircleGeometry(1.75, 20),
+        new THREE.MeshBasicMaterial({color:0x9fd8ff, transparent:true, opacity:.22, blending:THREE.AdditiveBlending, depthWrite:false, fog:false}));
+      rm.rotation.x = -Math.PI/2; rm.position.set(x+.5, py, z+.5);
+      scene.add(rm); ringMats.push({mat:rm.material, base:.22});
+    }
+    tpLinks.push({x, z, gh, hy, beamMats, ringMats, flash:0});
+  }
+  if (changed){ markDirty(); rebuildAll(); }
+}
+function doTeleport(L){                                          // 蓄力满：两界同址互传
+  const toHeaven = Math.abs(player.pos.y - (L.gh+2)) < 3;        // 当前在地面阵 → 上天堂
+  const ty = (toHeaven ? L.hy : L.gh) + 2.1;
+  poof(player.pos, 0x9fe8ff, 16); burst(player.pos, 0xbfe8ff, 10, 2.5);
+  player.pos.set(L.x+.5, ty, L.z+.5); player.vel.set(0,0,0);
+  lastGroundY = ty;                                              // 防落地误入超人飞姿
+  poof(player.pos, 0x9fe8ff, 16); burst(player.pos, 0xbfe8ff, 10, 2.5);
+  L.flash = 1; SFX.transform(); shake(.22);
+  tpLockL = L;                                                   // 到达锁定：踏出光阵才重新武装（防乒乓）
+  flashMsg(toHeaven ? '✨ 光阵充能完毕——升上天界圣殿！' : '✨ 光阵充能完毕——回到地面神殿！');
+}
+
+function genWorld(){
+  const cx=(WORLD-1)/2, cz=(WORLD-1)/2;
+  // 第一遍：多层噪声高度场（大陆起伏 + 山脊 + 细节）
+  for (let x=0;x<WORLD;x++) for (let z=0;z<WORLD;z++){
+    const dx=(x-cx)/cx, dz=(z-cz)/cz;
+    const fall = Math.max(0, 1 - (dx*dx+dz*dz)*1.05);            // 岛屿衰减
+    const cont = noise2(x*.02,z*.02)*12;                          // 大陆起伏
+    const ridge = Math.abs(noise2(x*.045,z*.045)-.5)*2;           // 山脊（低频=更高大山脉）
+    const detail = noise2(x*.15,z*.15)*3;
+    let h = 4 + fall*(9+cont) + ridge*fall*22 + detail*fall;
+    if (noise2(x*.008+901, z*.008+903) > .63)                     // 沙漠生物群系：地势压平成沙丘
+      h = 9 + (h-9)*.4 + Math.sin(x*.11)*Math.cos(z*.13)*1.4;
+    h = Math.max(2, Math.min(44, Math.round(h)));                 // 山峰可到 y44
+    hmap[x*WORLD+z]=h;
+  }
+  // 河流：蜿蜒河道下切到海平面以下，全局水面自动灌成河
+  for (let z=2; z<WORLD-2; z++){
+    const rx = WORLD*.62 + Math.sin(z*.012)*WORLD*.14 + (noise2(z*.05+71,913)-.5)*30;
+    for (let x=Math.floor(rx-3); x<=Math.ceil(rx+3); x++){
+      if (x<1 || x>=WORLD-1) continue;
+      const d = Math.abs(x+.5-rx);
+      if (d>3) continue;
+      const bed = WATER-1-Math.round((3-d)*.9);                   // 中心深、岸边浅
+      const ii = x*WORLD+z;
+      if (hmap[ii] > bed) hmap[ii] = bed;
+    }
+  }
+  // 第二遍：按坡度/海拔铺表面材质 + 种树 + 花草灌木
+  const slope = (x,z)=>{
+    const h0 = hmap[x*WORLD+z];
+    let mx = 0;
+    for (const [ox,oz] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      const nx=x+ox, nz=z+oz;
+      if (nx<0||nz<0||nx>=WORLD||nz>=WORLD) continue;
+      mx = Math.max(mx, Math.abs(hmap[nx*WORLD+nz]-h0));
+    }
+    return mx;
+  };
+  for (let x=0;x<WORLD;x++) for (let z=0;z<WORLD;z++){
+    const h = hmap[x*WORLD+z], s = slope(x,z);
+    const bio = noise2(x*.008+901, z*.008+903);
+    const desert = bio > .63, forest = bio < .40;                 // 生物群系：沙漠/森林/草原
+    for (let y=0;y<=h;y++){
+      let t = BLOCK.STONE;
+      if (y===h){
+        if (h <= WATER+1) t = BLOCK.SAND;                         // 滩涂
+        else if (h >= 27) t = BLOCK.SNOW;                         // 雪线
+        else if (s >= 3) t = BLOCK.STONE;                         // 陡坡露岩
+        else t = desert ? BLOCK.SAND : BLOCK.GRASS;               // 沙漠地表
+      }
+      else if (y>h-3 && h>WATER+1 && s<3 && h<27) t = desert ? BLOCK.SAND : BLOCK.DIRT;
+      setB(x,y,z,t);
+    }
+    if (desert){                                                  // 沙漠：仙人掌，无树无花草
+      if (h>WATER+2 && h<30 && s<2 && hash2(x*11+3, z*11+7) > .988){
+        const ch = 2+((hash2(x,z)*2)|0);
+        for (let y=1;y<=ch;y++) setB(x,h+y,z,BLOCK.CACTUS);
+        if (hash2(x+5,z)>.5) setB(x+1,h+ch-1,z,BLOCK.CACTUS);     // 侧臂
+      }
+      continue;
+    }
+    // 树：森林密（10%）/ 草原疏（2.8%），避开滩涂与雪线
+    const treeP = forest ? 0.90 : 0.972;
+    if (h>WATER+2 && h<26 && s<2 && hash2(x*7+1,z*7+3)>treeP && x>2 && x<WORLD-3 && z>2 && z<WORLD-3){
+      const th = 4+((hash2(x,z)*3)|0);
+      for (let y=1;y<=th;y++) setB(x,h+y,z,BLOCK.WOOD);
+      for (let ox=-2;ox<=2;ox++) for (let oz=-2;oz<=2;oz++) for (let oy=th-1;oy<=th+2;oy++){
+        if (Math.abs(ox)+Math.abs(oz)+Math.abs(oy-th) <= 3 && !(ox===0&&oz===0&&oy<th))
+          if (getB(x+ox,h+oy,z+oz)===BLOCK.AIR) setB(x+ox,h+oy,z+oz,BLOCK.LEAF);
+      }
+    }
+    // 花草灌木：草甸噪声控制疏密；森林里林下植被更密
+    if (h>WATER+2 && h<26 && s<3){
+      const pn = noise2(x*.09+37, z*.09+59);
+      const hd = hash2(x*13+5, z*17+9);
+      let plant = 0;
+      if (pn>.62 && hd>.30) plant = BLOCK.TGRASS;
+      else if (pn>.60 && hd<=.30 && hd>.16) plant = (hd>.23) ? BLOCK.FLR : BLOCK.FLY;
+      else if (hd>.968) plant = BLOCK.SHRUB;
+      if (plant && getB(x,h+1,z)===BLOCK.AIR) setB(x,h+1,z,plant);
+      if (forest && hash2(x*23+9, z*23+1)>.72 && getB(x,h+1,z)===BLOCK.AIR)
+        setB(x,h+1,z, hash2(x,z+7)>.6 ? BLOCK.TGRASS : BLOCK.SHRUB);
+    }
+  }
+  // 宫殿：平原上几座宏伟宫殿（对称柱廊+三重檐+塔楼）
+  const usedSpots = [];
+  for (let n=0; n<3; n++){
+    const s = flatSpot(7, 200+n, 90, usedSpots); if (!s) break;
+    buildGrandPalace(s.x, s.z, s.h);
+  }
+  {                                                              // 宫殿：找最高最平的高地
+    let best = null;
+    for (let tries=0; tries<900; tries++){
+      const x = 30+((hash2(tries*17+3, 811)*(WORLD-60))|0);
+      const z = 30+((hash2(tries*19+9, 833)*(WORLD-60))|0);
+      const h0 = hmap[x*WORLD+z];
+      if (h0<16 || h0>44) continue;
+      let mn=h0, mx=h0;
+      for (let dx=-6; dx<=6; dx++) for (let dz=-6; dz<=6; dz++){
+        const hh = hmap[(x+dx)*WORLD+(z+dz)];
+        if (hh<mn) mn=hh; if (hh>mx) mx=hh;
+      }
+      if (mx-mn>3) continue;
+      if (!best || h0>best.h) best = {x, z, h:h0};
+    }
+    if (best){
+      const {x,z,h} = best;
+      clearRegion(x-6,z-6,x+6,z+6,h+9);
+      for (let dx=-6; dx<=6; dx++) for (let dz=-6; dz<=6; dz++){
+        setB(x+dx,h,z+dz,BLOCK.STONE);                           // 石台基座
+        const wall = Math.abs(dx)===6 || Math.abs(dz)===6;
+        for (let dy=1; dy<=4; dy++){
+          if (!wall){ setB(x+dx,h+dy,z+dz,BLOCK.AIR); continue; }
+          const gate = (dx===-6 && dz===0 && dy<=2);             // 西门洞
+          setB(x+dx,h+dy,z+dz, gate?BLOCK.AIR:BLOCK.STONE);
+        }
+        if (wall){
+          setB(x+dx,h+5,z+dz,BLOCK.STONE);
+          if ((dx+dz)%2===0) setB(x+dx,h+6,z+dz,BLOCK.STONE);    // 城齿
+        }
+        if (Math.abs(dx)===6 && Math.abs(dz)===6){               // 四角角楼+光石
+          for (let dy=5; dy<=7; dy++) setB(x+dx,h+dy,z+dz,BLOCK.STONE);
+          setB(x+dx,h+8,z+dz,BLOCK.LITE);
+        }
+      }
+      setB(x,h+4,z,BLOCK.LITE);                                  // 殿内光石
+    }
+  }
+  // 第三遍：上界天堂——中央上方浮空岛群（云石+圣草+水晶树+光铃花）
+  for (let x=8;x<WORLD-8;x++) for (let z=8;z<WORLD-8;z++){
+    const dx=(x-cx)/cx, dz=(z-cz)/cz;
+    const fall = Math.max(0, 1 - (dx*dx+dz*dz)*1.5);
+    if (fall<=0) continue;
+    if (noise2(x*.045+555, z*.045+777) < .34) continue;        // 岛链空洞：岛与岛之间留出天空
+    const n = noise2(x*.03+211, z*.03+137);
+    const top = HEAVEN_Y + Math.round((n-.5)*9*fall + fall*2);
+    const thick = Math.max(2, Math.round(fall*(3 + noise2(x*.07+50, z*.07+80)*5)));
+    for (let y=top-thick;y<=top;y++) setB(x,y,z, y===top?BLOCK.HGRASS:BLOCK.CSTONE);
+    if (fall>.55 && hash2(x*7+11,z*7+29)>0.992 && x>10 && x<WORLD-11 && z>10 && z<WORLD-11){
+      const th = 3+((hash2(x,z+99)*3)|0);                         // 水晶树
+      for (let y=1;y<=th;y++) if (getB(x,top+y,z)===BLOCK.AIR) setB(x,top+y,z,BLOCK.LWOOD);
+      for (let ox=-2;ox<=2;ox++) for (let oz=-2;oz<=2;oz++) for (let oy=th-1;oy<=th+2;oy++){
+        if (Math.abs(ox)+Math.abs(oz)+Math.abs(oy-th) <= 3 && !(ox===0&&oz===0&&oy<th))
+          if (getB(x+ox,top+oy,z+oz)===BLOCK.AIR) setB(x+ox,top+oy,z+oz,BLOCK.CRYSTAL);
+      }
+    } else if (hash2(x*3+1,z*3+7)>.93) setB(x,top+1,z,BLOCK.BELL);
+  }
+}
+genWorld();
+
+/* ---------- 天堂瀑布：岛缘引水入地面河流——半透明水柱 + 底部水雾 + 五色彩虹拱（装饰层，每次启动按地形重建） ---------- */
+const fallFx = [];
+function buildHeavenFalls(){
+  const isHeavenTop = (x,z)=>{
+    if (x<6||z<6||x>=WORLD-6||z>=WORLD-6) return 0;
+    for (let y=HEAVEN_Y+14; y>=HEAVEN_Y-6; y--){
+      const b = getB(x,y,z);
+      if (b===BLOCK.HGRASS || b===BLOCK.CSTONE) return y;
+      if (b!==BLOCK.AIR && b!==BLOCK.BELL && b!==BLOCK.CRYSTAL && b!==BLOCK.LWOOD) return 0;
+    }
+    return 0;
+  };
+  const riverX = z => WORLD*.62 + Math.sin(z*.012)*WORLD*.14;    // 主河道走向（引水入河优先）
+  const cands = [];
+  for (let x=12; x<WORLD-16; x+=6)
+    for (let z=12; z<WORLD-16; z+=6){
+      const top = isHeavenTop(x,z);
+      if (!top) continue;
+      if (isHeavenTop(x+3,z) && isHeavenTop(x-3,z) && isHeavenTop(x,z+3) && isHeavenTop(x,z-3)) continue;   // 只要岛缘
+      if (cands.some(s=>Math.hypot(s[0]-x,s[1]-z)<60)) continue;
+      const groundY = onSurfaceY(x, z, HEAVEN_Y-8);
+      cands.push({x, z, top, groundY, river: Math.abs(x+.5-riverX(z))});
+    }
+  cands.sort((a,b)=>a.river-b.river);                            // 落进河里的优先
+  for (const s of cands.slice(0, 4)){
+    const {x, z, top, groundY} = s;
+    const H = top + 1.2 - groundY;
+    if (H < 12) continue;                                        // 太短的瀑布不立
+    const g = new THREE.Group();
+    const wMat = new THREE.MeshLambertMaterial({color:0x8cc3ee, transparent:true, opacity:.5, emissive:0x9fd4ff});   // 圣水自发光：夜里整条水柱发亮
+    glowMats.push({mat:wMat, base:.8});
+    const core = new THREE.Mesh(new THREE.BoxGeometry(2.2, H, 1.3), wMat);
+    core.position.y = groundY + H/2;
+    const halo = new THREE.Mesh(new THREE.BoxGeometry(3.4, H*.94, 2.4),
+      new THREE.MeshLambertMaterial({color:0xcfe8ff, transparent:true, opacity:.2, emissive:0xbfe4ff}));
+    glowMats.push({mat:halo.material, base:.7});
+    halo.position.copy(core.position);
+    const lip = new THREE.Mesh(new THREE.BoxGeometry(2.6, .6, 1.7), wMat);   // 岛缘出水口
+    lip.position.set(0, top + .8, 0);
+    g.add(core, halo, lip);
+    if (groundY > WATER+1){                                      // 落点不在河里：补一汪水潭
+      const pool = new THREE.Mesh(new THREE.CircleGeometry(3.2, 18),
+        new THREE.MeshLambertMaterial({color:0x2f6fd4, transparent:true, opacity:.5, emissive:0x4d8fe0}));
+      glowMats.push({mat:pool.material, base:.7});
+      pool.rotation.x = -Math.PI/2; pool.position.y = groundY + .58;
+      g.add(pool);
+    }
+    const mistMat = new THREE.MeshLambertMaterial({color:0xffffff, transparent:true, opacity:.3, emissive:0x9fc4d8});
+    glowMats.push({mat:mistMat, base:.6});
+    const mists = [];                                            // 底部水雾团（缓动漂浮，微光）
+    for (let i=0;i<7;i++){
+      const m = new THREE.Mesh(new THREE.SphereGeometry(1.1+Math.random()*1.2, 8, 6), mistMat);
+      const a = Math.random()*Math.PI*2, rr = 1+Math.random()*2.6;
+      m.position.set(Math.cos(a)*rr, groundY + 1 + Math.random()*2.4, Math.sin(a)*rr);
+      m.userData = {baseY:m.position.y, ph:Math.random()*9, spd:.6+Math.random()*.7};
+      g.add(m); mists.push(m);
+    }
+    const RBC = [0xff6a6a, 0xffa94d, 0xffe066, 0x8fe08a, 0x6fb1ff];          // 彩虹五拱
+    for (let i=0;i<5;i++){
+      const t = new THREE.Mesh(new THREE.TorusGeometry(5.2+i*.75, .28, 6, 42, Math.PI),
+        new THREE.MeshBasicMaterial({color:RBC[i], transparent:true, opacity:.2, blending:THREE.AdditiveBlending, depthWrite:false}));
+      t.position.y = groundY + .6;
+      t.rotation.y = .7 + Math.random()*.5;
+      g.add(t);
+    }
+    g.position.set(x+.5, 0, z+.5);
+    scene.add(g);
+    fallFx.push({g, mists});
+    addNightLight(x+.5, Math.max(groundY, WATER)+2.2, z+.5, 0x9fd4ff, 1.3, 15);   // 落水处夜光：照亮水面与岸边
+  }
+}
+
+/* ---------- 水面与云（装饰层） ---------- */
+const waterMat = new THREE.MeshLambertMaterial({color:0x2f6fd4, transparent:true, opacity:.55});
+const water = new THREE.Mesh(new THREE.PlaneGeometry(WORLD, WORLD), waterMat);
+water.rotation.x = -Math.PI/2; water.position.set(WORLD/2, WATER+.55, WORLD/2);
+scene.add(water);
+const clouds = [];
+const cloudMat = new THREE.MeshLambertMaterial({color:0xffffff, emissive:0x3a3f4a, transparent:true, opacity:.8});
+cloudMat.__shared = true;
+const cloudGeos = [new THREE.BoxGeometry(5,1.8,3.6), new THREE.BoxGeometry(3.4,1.4,2.6), new THREE.BoxGeometry(2.2,1.1,1.8)];
+for (const g of cloudGeos) g.__shared = true;
+/* 云朵 = 多个白色方块组成的团簇，比单块平板立体得多 */
+function makeCloudPuff(y0, y1){
+  const g = new THREE.Group();
+  const n = 5 + (Math.random()*4|0);
+  for (let i=0;i<n;i++){
+    const p = new THREE.Mesh(cloudGeos[(Math.random()*3)|0], cloudMat);
+    p.position.set((Math.random()-.5)*9, (Math.random()-.5)*1.4, (Math.random()-.5)*5);
+    p.scale.setScalar(.7+Math.random()*.8);
+    p.rotation.y = Math.random()*Math.PI;
+    g.add(p);
+  }
+  g.position.set(Math.random()*WORLD, y0+Math.random()*(y1-y0), Math.random()*WORLD);
+  g.userData = {spd:.5+Math.random()*.9, baseY:g.position.y, ph:Math.random()*9};
+  scene.add(g); clouds.push(g);
+}
+for (let i=0;i<16;i++) makeCloudPuff(48, 64);      // 主世界与天堂之间的云层
+for (let i=0;i<12;i++) makeCloudPuff(100, 114);    // 天堂之上的高云
+
+/* ---------- 天空系统：渐变穹顶 + 太阳月亮升落 + 星星 + 晨昏暖色 ---------- */
+const DUSK_C = new THREE.Color(0xff9a5e);          // 晨昏地平线暖橙
+const skyGroup = new THREE.Group(); scene.add(skyGroup);
+const skyUniforms = { topC:{value:new THREE.Color(0x2f7fff)}, botC:{value:new THREE.Color(0xaee6ff)} };
+const skyDome = new THREE.Mesh(
+  new THREE.SphereGeometry(520, 24, 12),
+  new THREE.ShaderMaterial({ side:THREE.BackSide, depthWrite:false, fog:false, uniforms:skyUniforms,
+    vertexShader:'varying vec3 vP; void main(){ vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+    fragmentShader:'varying vec3 vP; uniform vec3 topC; uniform vec3 botC; void main(){ float h=normalize(vP).y*.5+.5; gl_FragColor=vec4(mix(botC,topC,smoothstep(.44,.8,h)),1.); }' }));
+skyDome.renderOrder = -30; skyDome.frustumCulled = false;
+skyGroup.add(skyDome);
+const starGeo = new THREE.BufferGeometry();
+{
+  const sp = [];
+  for (let i=0;i<380;i++){
+    const v = new THREE.Vector3(Math.random()-.5, Math.random()*.6+.08, Math.random()-.5).normalize().multiplyScalar(490);
+    sp.push(v.x, v.y, v.z);
+  }
+  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
+}
+const starMat = new THREE.PointsMaterial({color:0xcfe0ff, size:1.7, sizeAttenuation:false, transparent:true, opacity:0, fog:false});
+const stars = new THREE.Points(starGeo, starMat);
+stars.renderOrder = -29; stars.frustumCulled = false;
+skyGroup.add(stars);
+const sunDisc = new THREE.Mesh(new THREE.CircleGeometry(30, 20),
+  new THREE.MeshBasicMaterial({color:0xfff2b8, fog:false, transparent:true, opacity:.95, depthWrite:false}));
+const moonDisc = new THREE.Mesh(new THREE.CircleGeometry(18, 20),
+  new THREE.MeshBasicMaterial({color:0xdfe8ff, fog:false, transparent:true, opacity:.85, depthWrite:false}));
+sunDisc.renderOrder = -28; moonDisc.renderOrder = -28;
+sunDisc.frustumCulled = moonDisc.frustumCulled = false;
+skyGroup.add(sunDisc, moonDisc);
+const SUN_DIR = new THREE.Vector3();              // 太阳方向复用
+
+/* ---------- 分块实例化渲染（256 世界必须分块：整图重建单次就要上百毫秒） ---------- */
+const blockGeo = new THREE.BoxGeometry(1,1,1);
+blockGeo.__shared = true;
+function crossGeo(){                                          // 花草十字面片几何
+  const g = new THREE.BufferGeometry();
+  const P = new Float32Array([-.5,0,0, .5,0,0, .5,1,0, -.5,0,0, .5,1,0, -.5,1,0,
+                               0,0,-.5, 0,0,.5, 0,1,.5, 0,0,-.5, 0,1,.5, 0,1,-.5]);
+  const U = new Float32Array([0,0, 1,0, 1,1, 0,0, 1,1, 0,1, 0,0, 1,0, 1,1, 0,0, 1,1, 0,1]);
+  const N = new Float32Array(36); for (let i=1;i<36;i+=3) N[i]=1;
+  g.setAttribute('position', new THREE.BufferAttribute(P,3));
+  g.setAttribute('uv', new THREE.BufferAttribute(U,2));
+  g.setAttribute('normal', new THREE.BufferAttribute(N,3));
+  return g;
+}
+const plantGeo = crossGeo(); plantGeo.__shared = true;
+const dummy = new THREE.Object3D();
+const aoCol = new THREE.Color();                               // 实例AO亮度复用
+function exposed(x,y,z){
+  return !SOLID.has(getB(x,y+1,z)) || !SOLID.has(getB(x,y-1,z)) ||
+         !SOLID.has(getB(x+1,y,z)) || !SOLID.has(getB(x-1,y,z)) ||
+         !SOLID.has(getB(x,y,z+1)) || !SOLID.has(getB(x,y,z-1));
+}
+/* 模型/网格销毁时必须释放 geometry/material，否则 GPU 资源累积 → 越玩越卡 */
+function disposeGroup(g){
+  g.traverse(o=>{
+    if (o.geometry && !o.geometry.__shared) o.geometry.dispose();
+    if (o.material){
+      const ms = Array.isArray(o.material) ? o.material : [o.material];
+      for (const mm of ms) if (!mm.__shared) mm.dispose();       // 头部等多材质数组逐个释放（贴图全局缓存不释放）
+    }
+  });
+}
+/* 共享材质：方块类型 / 花草类型（双面 + alphaTest 镂空） */
+const matCube = {}, matPlant = {};
+for (const t of [...PLACEABLE, BLOCK.CSTONE, BLOCK.HGRASS, BLOCK.CRYSTAL, BLOCK.LWOOD, BLOCK.CACTUS]){
+  matCube[t] = new THREE.MeshLambertMaterial({map:TEXS[t].tex}); matCube[t].__shared = true;
+}
+/* 天界夜光方块：水晶树冠/光木树干入夜泛微光（连带两界神殿的水晶柱、檐口、发光窗一齐亮） */
+for (const [t, c, b] of [[BLOCK.CRYSTAL, 0x2f7f9f, .45], [BLOCK.LWOOD, 0x6e5a34, .28], [BLOCK.LITE, 0x6a4e1e, .55]])
+  if (matCube[t]){ matCube[t].emissive.setHex(c); glowMats.push({mat:matCube[t], base:b}); }
+for (const t of PLANTS){
+  matPlant[t] = new THREE.MeshLambertMaterial({map:TEXS[t].tex, alphaTest:.5, side:THREE.DoubleSide});
+  matPlant[t].__shared = true;
+}
+const CH = 32, NC = WORLD/CH;
+const chunks = [];
+for (let cz=0;cz<NC;cz++) for (let cx=0;cx<NC;cx++)
+  chunks.push({cx, cz, meshes:[], center:new THREE.Vector3(cx*CH+CH/2, HEIGHT/2, cz*CH+CH/2), radius:CH, dirty:true});
+function rebuildChunk(c){
+  for (const m of c.meshes){ scene.remove(m); m.dispose(); }
+  c.meshes.length = 0;
+  const lists = {};
+  let lo = HEIGHT, hi = 0;
+  for (let x=c.cx*CH; x<c.cx*CH+CH; x++)
+    for (let z=c.cz*CH; z<c.cz*CH+CH; z++)
+      for (let y=0; y<HEIGHT; y++){
+        const b = vox[idx(x,y,z)];
+        if (!b) continue;
+        if (y<lo) lo=y; if (y>hi) hi=y;
+        if (PLANTS.has(b) || exposed(x,y,z)) (lists[b] = lists[b]||[]).push(x,y,z);
+      }
+  for (const key of Object.keys(lists)){
+    const t = +key, list = lists[t], count = list.length/3;
+    const plant = PLANTS.has(t);
+    const mesh = new THREE.InstancedMesh(plant?plantGeo:blockGeo, plant?matPlant[t]:matCube[t], Math.max(count,1));
+    mesh.count = count; mesh.frustumCulled = false;
+    for (let i=0;i<count;i++){
+      const bx = list[i*3], by = list[i*3+1], bz = list[i*3+2];
+      dummy.position.set(bx+.5, by+(plant?0:.5), bz+.5);
+      dummy.rotation.set(0, plant ? ((hash2(bx,bz)*4)|0)*Math.PI/2 : 0, 0);
+      dummy.updateMatrix(); mesh.setMatrixAt(i, dummy.matrix);
+      if (!plant){                                             // 逐实例环境光遮蔽（0fps式近似）：邻块越多越暗
+        let occ = 0;                                           // 树冠下/墙角/洞穴口自然出阴影
+        if (SOLID.has(getB(bx,by+1,bz))) occ += 3;             // 顶盖遮蔽影响最大
+        if (SOLID.has(getB(bx+1,by,bz))) occ++;
+        if (SOLID.has(getB(bx-1,by,bz))) occ++;
+        if (SOLID.has(getB(bx,by,bz+1))) occ++;
+        if (SOLID.has(getB(bx,by,bz-1))) occ++;
+        const v = Math.max(.62, 1 - occ*.055) * (.965 + hash2(bx*3+by*7, bz*5)*.07);   // 微随机打破均匀色块
+        mesh.setColorAt(i, aoCol.setScalar(v));
+      }
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    scene.add(mesh); c.meshes.push(mesh);
+  }
+  c.center.set(c.cx*CH+CH/2, lo<HEIGHT ? (lo+hi)/2+.5 : 0, c.cz*CH+CH/2);
+  c.radius = Math.sqrt(CH*CH/2 + Math.pow((hi-lo)/2+1, 2));
+  c.dirty = false;
+}
+function rebuildAll(){ for (const c of chunks) rebuildChunk(c); }
+function dirtyArea(x0,x1,z0,z1){
+  const a = Math.max(0, Math.floor(x0/CH)), b = Math.min(NC-1, Math.floor(x1/CH));
+  const d = Math.max(0, Math.floor(z0/CH)), e = Math.min(NC-1, Math.floor(z1/CH));
+  for (let cz=d; cz<=e; cz++) for (let cx=a; cx<=b; cx++) chunks[cz*NC+cx].dirty = true;
+}
+const dirtyBlock = (x,y,z)=>dirtyArea(x-1,x+1,z-1,z+1);
+function pumpChunks(){                                        // 每帧最多重建 2 块，挖方块不再顿挫
+  let n = 0;
+  for (const c of chunks){ if (c.dirty){ rebuildChunk(c); if (++n>=2) break; } }
+}
+const visFrustum = new THREE.Frustum(), visMat = new THREE.Matrix4(), visSphere = new THREE.Sphere();
+function updateChunkVisibility(){                             // 视锥 + 距离双裁剪（距离跟随当前雾距：雾外区块本来看不见，不白画）
+  visMat.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+  visFrustum.setFromProjectionMatrix(visMat);
+  const visDist = Math.min(scene.fog.far + 10, VIEW);
+  for (const c of chunks){
+    const vis = c.meshes.length>0 && camera.position.distanceTo(c.center) < visDist + c.radius
+              && visFrustum.intersectsSphere(visSphere.set(c.center, c.radius));
+    for (const m of c.meshes) m.visible = vis;
+  }
+}
+rebuildAll();
+// 顶部空气墙防出界
+const wallMat = new THREE.MeshBasicMaterial({color:0x9fd4ff, transparent:true, opacity:0});
+for (const [px,pz,ry] of [[WORLD/2,0,0],[WORLD/2,WORLD,0],[0,WORLD/2,Math.PI/2],[WORLD,WORLD/2,Math.PI/2]]){
+  const w = new THREE.Mesh(new THREE.PlaneGeometry(WORLD,HEIGHT), wallMat);
+  w.position.set(px, HEIGHT/2, pz); w.rotation.y = ry; scene.add(w);
+}
+
+/* ---------- 方块操作 ---------- */
+const hi = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1.02,1.02,1.02)),
+  new THREE.LineBasicMaterial({color:0xffffff}));
+scene.add(hi);
+
+/* 体素 DDA 射线（Amanatides-Woo 网格步进）：十来步出结果，
+ * 取代对几千个实例的 three.js 射线检测——那是之前每帧卡顿的主因 */
+function voxelRay(origin, dir, maxDist){
+  let x = Math.floor(origin.x), y = Math.floor(origin.y), z = Math.floor(origin.z);
+  const sx = dir.x>0?1:-1, sy = dir.y>0?1:-1, sz = dir.z>0?1:-1;
+  const dx = Math.abs(dir.x)<1e-9 ? Infinity : Math.abs(1/dir.x);
+  const dy = Math.abs(dir.y)<1e-9 ? Infinity : Math.abs(1/dir.y);
+  const dz = Math.abs(dir.z)<1e-9 ? Infinity : Math.abs(1/dir.z);
+  let tx = dx===Infinity ? Infinity : (sx>0 ? (x+1-origin.x) : (origin.x-x)) * dx;
+  let ty = dy===Infinity ? Infinity : (sy>0 ? (y+1-origin.y) : (origin.y-y)) * dy;
+  let tz = dz===Infinity ? Infinity : (sz>0 ? (z+1-origin.z) : (origin.z-z)) * dz;
+  let nx=0, ny=0, nz=0, t=0;
+  for (let i=0;i<160;i++){
+    if (getB(x,y,z)!==BLOCK.AIR)                              // 花草也可被准星选中打掉
+      return {x,y,z, nx,ny,nz, dist:t};
+    if (tx < ty && tx < tz){ x+=sx; t=tx; tx+=dx; nx=-sx; ny=0; nz=0; }
+    else if (ty < tz){ y+=sy; t=ty; ty+=dy; nx=0; ny=-sy; nz=0; }
+    else { z+=sz; t=tz; tz+=dz; nx=0; ny=0; nz=-sz; }
+    if (t > maxDist) return null;
+  }
+  return null;
+}
+function blockHitFrom(origin, dir, maxDist){
+  return voxelRay(origin, dir, maxDist);
+}
+
+/* ---------- 模型工厂 ---------- */
+function boxPart(w,h,d,color,emissive){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d),
+    new THREE.MeshLambertMaterial({color, emissive: emissive||0x000000}));
+  return m;
+}
+/* ---------- 方块风格像素皮肤（角色/怪兽贴图；纹理全局缓存共享，材质按实例新建供受击闪红） ---------- */
+const skinCache = new Map();
+const css = n => '#' + n.toString(16).padStart(6,'0');
+function pixTex(key, paint){
+  let t = skinCache.get(key);
+  if (!t){
+    const cv = document.createElement('canvas'); cv.width = cv.height = 16;
+    paint(cv.getContext('2d'));
+    t = new THREE.CanvasTexture(cv);
+    t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter;
+    skinCache.set(key, t);
+  }
+  return t;
+}
+function pnoise(g, base, amp, n, seed){        // 底色 + 明暗噪点（像素布料/皮肤/岩石质感）
+  g.fillStyle = css(base); g.fillRect(0,0,16,16);
+  let s = seed||7; const rnd = ()=>(s=(s*16807)%2147483647)/2147483647;
+  for (let i=0;i<(n||40);i++){
+    g.fillStyle = shade(css(base), (rnd()-.5)*2*(amp||.12));
+    g.fillRect((rnd()*16)|0,(rnd()*16)|0,1,1);
+  }
+}
+function skinMat(key, paint, emissive){
+  return new THREE.MeshLambertMaterial({map:pixTex(key,paint), emissive:emissive||0x000000});
+}
+function boxTex(w,h,d,mat){ return new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat); }
+function makeHumanoid(cfg){
+  const g = new THREE.Group();
+  const s = cfg.scale||1;
+  const giant = !!cfg.eye;                                       // 巨人（发光眼）走巨人涂装，否则 Steve 风人类
+  const pre = giant ? 'gt' : 'st';
+  /* 头：脸/侧/顶/底/背 六面分离贴图（MC 头像画法） */
+  const mFace = skinMat(pre+'-face', gg=>{
+    if (giant){
+      pnoise(gg, cfg.head, .1, 24, 11);
+      gg.fillStyle = '#fff6b8'; gg.fillRect(2,6,4,2); gg.fillRect(10,6,4,2);   // 横长眼窝
+      gg.fillStyle = css(cfg.eye); gg.fillRect(3,6,2,2); gg.fillRect(11,6,2,2);// 发光虹膜
+      gg.fillStyle = shade(css(cfg.head), -.28); gg.fillRect(6,11,4,1);        // 嘴线
+    } else {
+      pnoise(gg, cfg.head, .07, 14, 5);
+      gg.fillStyle = '#4a3120'; gg.fillRect(0,0,16,4);                         // 刘海
+      gg.fillStyle = '#ffffff'; gg.fillRect(3,7,2,2); gg.fillRect(11,7,2,2);   // 眼白
+      gg.fillStyle = '#4a3a8a'; gg.fillRect(4,7,2,2); gg.fillRect(10,7,2,2);   // 虹膜
+      gg.fillStyle = '#b5825a'; gg.fillRect(7,9,2,2);                          // 鼻影
+      gg.fillStyle = '#7a4a30'; gg.fillRect(6,12,4,1);                         // 嘴
+    }
+  });
+  const mSide = skinMat(pre+'-side', gg=>{
+    pnoise(gg, cfg.head, .1, 26, 9);
+    if (!giant) gg.fillStyle = '#4a3120', gg.fillRect(0,0,16,4);               // 侧发
+  });
+  const mTop = skinMat(pre+'-top', gg=>{
+    if (giant) pnoise(gg, cfg.head, .1, 26, 3);
+    else pnoise(gg, 0x4a3120, .15, 30, 3);                                     // 头顶全是头发
+  });
+  const mBot = skinMat(pre+'-bot', gg=> pnoise(gg, giant?cfg.head:0x4a3120, .1, 20, 4));
+  const mBack = skinMat(pre+'-back', gg=>{
+    pnoise(gg, cfg.head, .1, 24, 8);
+    if (!giant) gg.fillStyle = '#4a3120', gg.fillRect(0,0,16,6);               // 后脑勺头发
+  });
+  const head = new THREE.Mesh(new THREE.BoxGeometry(.5*s,.5*s,.5*s), [mSide,mSide,mTop,mBot,mFace,mBack]);
+  head.position.y = 1.55*s; g.add(head);
+  if (cfg.crest){ const c = boxPart(.08*s,.3*s,.28*s, cfg.crest); c.position.set(0,1.85*s,0); g.add(c); }
+  if (cfg.eye){ // 巨人发光眼
+    const e1 = boxPart(.09*s,.07*s,.02*s, 0x000000, cfg.eye); e1.position.set(-.12*s,1.58*s,.26*s); g.add(e1);
+    const e2 = e1.clone(); e2.position.x = .12*s; g.add(e2);
+  }
+  const mTorso = skinMat(pre+'-torso', gg=>{
+    pnoise(gg, cfg.torso, .13, 40, 6);
+    if (giant){
+      gg.fillStyle = css(cfg.head); gg.fillRect(0,0,16,3);                     // 银色肩甲带
+      gg.fillStyle = shade(css(cfg.torso), -.2); gg.fillRect(0,15,16,1);
+    } else {
+      gg.fillStyle = shade(css(cfg.torso), .18); gg.fillRect(0,0,16,1);        // 领口高光
+      gg.fillStyle = shade(css(cfg.torso), -.22); gg.fillRect(0,15,16,1);      // 衣摆
+    }
+  });
+  const torso = boxTex(.55*s,.6*s,.3*s, mTorso); torso.position.y = 1.0*s; g.add(torso);
+  const chest = new THREE.Mesh(new THREE.SphereGeometry(.09*s,8,8),
+    new THREE.MeshBasicMaterial({color:cfg.chest||0x2255aa}));
+  chest.position.set(0,1.08*s,.17*s); g.add(chest);
+  const mArm = skinMat(pre+'-arm', gg=>{
+    pnoise(gg, cfg.arm, .09, 24, 12);
+    if (giant) gg.fillStyle = css(cfg.torso), gg.fillRect(0,0,16,5);           // 红色肩段
+    else {
+      gg.fillStyle = css(cfg.torso); gg.fillRect(0,0,16,4);                    // 短袖
+      gg.fillStyle = shade(css(cfg.arm), -.15); gg.fillRect(0,15,16,1);        // 手背阴影
+    }
+  });
+  const armL = boxTex(.18*s,.62*s,.18*s, mArm); armL.position.set(-.38*s,1.02*s,0);
+  const armR = armL.clone(); armR.position.x = .38*s;
+  armL.geometry.translate(0,-.22*s,0); armR.geometry.translate(0,-.22*s,0);
+  armL.position.y = 1.28*s; armR.position.y = 1.28*s;
+  const mLeg = skinMat(pre+'-leg', gg=>{
+    pnoise(gg, cfg.leg, .11, 26, 14);
+    if (giant){ gg.fillStyle = css(cfg.torso); gg.fillRect(0,11,16,5); }       // 红色战靴
+    else { gg.fillStyle = '#2e2e34'; gg.fillRect(0,13,16,3); }                 // 鞋
+  });
+  const legL = boxTex(.2*s,.72*s,.2*s, mLeg); legL.geometry.translate(0,-.3*s,0); legL.position.set(-.15*s,.72*s,0);
+  const legR = legL.clone(); legR.position.x = .15*s;
+  g.add(armL,armR,legL,legR);
+  return {group:g, armL,armR,legL,legR, head, chest, torso};
+}
+function makeKaiju(scale, kind, variant){
+  const g = new THREE.Group(); const s = scale;
+  const mega = kind==='mega', boss = kind==='boss';
+  if (mega){
+    /* 巨兽王风格：直立厚躯干 + 背鳍列 + 粗长尾 + 小前肢 + 黄眼巨口 */
+    const bodyC=0x3a5a44, plateC=0xcfe0c0, limbC=0x2c4434;
+    const mBody = skinMat('kj-mega-body', gg=>{
+      pnoise(gg, bodyC, .14, 44, 21);
+      gg.fillStyle = shade(css(bodyC), -.25); gg.fillRect(0,8,16,1);
+      gg.fillStyle = css(plateC);                                 // 浅色腹甲：竖板条纹（巨兽王标志腹纹）
+      for (let x=1;x<16;x+=3) gg.fillRect(x,9,2,7);
+    });
+    const mHead = skinMat('kj-mega-head', gg=>{
+      pnoise(gg, 0x41654c, .14, 36, 22);
+      gg.fillStyle = shade(css(0x41654c), -.3); gg.fillRect(2,3,12,2);          // 眉骨阴影
+    });
+    const mLimb = skinMat('kj-mega-limb', gg=> pnoise(gg, limbC, .16, 40, 23));
+    const mFin = skinMat('kj-mega-fin', gg=> pnoise(gg, plateC, .12, 30, 24));
+    const torso = boxTex(1.5*s,1.6*s,1.1*s, mBody); torso.position.y=1.5*s; g.add(torso);
+    const chest = boxTex(1.2*s,.9*s,1.0*s, mBody); chest.position.set(0,2.4*s,.15*s); g.add(chest);
+    const head = boxTex(.85*s,.7*s,.95*s, mHead); head.position.set(0,3.1*s,.5*s); g.add(head);
+    const jaw = boxTex(.7*s,.22*s,.8*s, mHead); jaw.position.set(0,2.7*s,.62*s); g.add(jaw);
+    for (let i=-1;i<=1;i++){ const th=boxPart(.09*s,.14*s,.05*s,0xf5f2e8); th.position.set(i*.22*s,2.9*s,1.0*s); g.add(th); }
+    const e1 = boxPart(.14*s,.08*s,.03*s,0x000000,0xffe23a); e1.position.set(-.2*s,3.2*s,.98*s); e1.material.__keepGlow=true; g.add(e1);
+    const e2 = e1.clone(); e2.position.x=.2*s; g.add(e2);
+    for (let i=0;i<5;i++){                                       // 背鳍列（巨兽王标志）
+      const ph = .5+Math.sin(i/4*Math.PI)*.55;
+      const fin = boxTex(.16*s, ph*s, .5*s, mFin);
+      fin.position.set(0, (2.2+ph*.45)*s, (.25-i*.38)*s);
+      fin.rotation.x = -.25; g.add(fin);
+    }
+    const armL = boxTex(.28*s,.55*s,.3*s, mLimb); armL.geometry.translate(0,-.2*s,0); armL.position.set(-.85*s,2.3*s,.55*s);
+    const armR = armL.clone(); armR.position.x=.85*s; g.add(armL,armR);
+    const legL = boxTex(.5*s,1.0*s,.6*s, mLimb); legL.geometry.translate(0,-.45*s,0); legL.position.set(-.45*s,1.0*s,0);
+    const legR = legL.clone(); legR.position.x=.45*s; g.add(legL,legR);
+    const tail1 = boxTex(.7*s,.5*s,1.4*s, mBody); tail1.position.set(0,.7*s,-1.2*s); tail1.rotation.x=.18; g.add(tail1);
+    const tail2 = boxTex(.4*s,.3*s,1.2*s, mBody); tail2.position.set(0,.45*s,-2.3*s); tail2.rotation.x=.3; g.add(tail2);
+    return {group:g, legL,legR,armL,armR, tail:tail1, wL:null,wR:null, scl:s, mouthY:2.9, eyeMats:[e1.material], eyeHex:0xffe23a};
+  }
+  variant = (!mega && !boss) ? (variant||'stalker') : null;
+  /* 每种变体独立配色：潜行者暗灰红眼 / 疾行者枯绿橙眼 / 装甲兽暗红绿眼 / 飞翼兽暗紫荧光眼 */
+  const P = {
+    stalker:{body:0x444a5e, head:0x565d75, eye:0xff2020, bone:0x8f97ad},
+    runner: {body:0x56662c, head:0x6a7a36, eye:0xffa202, bone:0xc9d3a8},
+    brute:  {body:0x5f3434, head:0x744648, eye:0x39ff6e, bone:0x2c2f38},
+    wing:   {body:0x3c2f5e, head:0x523f7e, eye:0x8dff2f, bone:0x8f86c9},
+    boss:   {body:0x5a2f7a, head:0x6d3a8f, eye:0xff2020, bone:0xd8c78a},
+    mega:   {body:0x7a1f2f, head:0x8f2640, eye:0xffe23a, bone:0xd8c78a},
+  }[mega?'mega':boss?'boss':variant];
+  const bw = variant==='brute'?1.25 : variant==='runner'?.68 : variant==='wing'?.72 : .9;
+  const vk = boss ? 'boss' : variant;
+  const mBody = skinMat('kj-'+vk+'-body', gg=>{
+    pnoise(gg, P.body, .15, 44, 31);
+    gg.fillStyle = shade(css(P.body), .26); gg.fillRect(2,10,12,6);            // 浅色腹部
+    let s2 = 34; const r2 = ()=>(s2=(s2*16807)%2147483647)/2147483647;
+    gg.fillStyle = shade(css(P.body), -.12);
+    for (let i=0;i<8;i++) gg.fillRect(2+((r2()*12)|0), 10+((r2()*6)|0), 1, 1); // 腹部噪点
+  });
+  const mHead2 = skinMat('kj-'+vk+'-head', gg=>{
+    pnoise(gg, P.head, .15, 36, 32);
+    gg.fillStyle = shade(css(P.head), -.3); gg.fillRect(1,3,14,2);             // 眉骨阴影
+  });
+  const mLimb = skinMat('kj-'+vk+'-limb', gg=> pnoise(gg, 0x3c4156, .16, 40, 33));
+  const body = boxTex(bw*s,.8*s,1.1*s, mBody); body.position.y = .95*s;
+  if (variant==='runner') body.rotation.x = .22;                    // 疾行者弓身前倾
+  g.add(body);
+  const hs2 = variant==='brute'?.44:.55;
+  const head = boxTex(hs2*s,.45*s,.5*s, mHead2); head.position.set(0,1.35*s,.55*s); g.add(head);
+  /* 血盆大口 + 白牙：恐怖感的主要来源 */
+  const jaw = boxTex(hs2*s-.05,.15*s,.44*s, mHead2); jaw.position.set(0,1.13*s,.6*s); g.add(jaw);
+  for (let i=-1;i<=1;i++){
+    const th = boxPart(.07*s,.15*s,.05*s, 0xf5f2e8); th.position.set(i*.15*s, 1.27*s, .82*s); g.add(th);
+  }
+  const e1 = boxPart(.1*s,.06*s,.02*s,0x000000, P.eye); e1.position.set(-.13*s,1.42*s,.8*s); g.add(e1);
+  const e2 = e1.clone(); e2.position.x=.13*s; g.add(e2);
+  e1.material.__keepGlow = true;                                   // 眼睛自发光不受受击闪红影响
+  if (boss || mega){
+    const hs = mega? .14 : .08;
+    const h1 = boxPart(hs*s,.5*s,hs*s,P.bone); h1.position.set(-.2*s,1.75*s,.42*s); g.add(h1);
+    const h2 = h1.clone(); h2.position.x=.2*s; g.add(h2);
+  }
+  if (mega){ for (let i=0;i<3;i++){   // 背刺
+    const sp = boxPart(.1*s,.4*s,.24*s,P.bone); sp.position.set(0,1.35*s,(-.1-i*.32)*s); sp.rotation.x=-.5; g.add(sp);
+  } }
+  if (variant==='brute'){                                          // 装甲兽：肩甲 + 背板
+    const p1 = boxPart(.5*s,.28*s,.6*s, P.bone); p1.position.set(-.75*s,1.3*s,.1*s); g.add(p1);
+    const p2 = p1.clone(); p2.position.x=.75*s; g.add(p2);
+    const bk = boxPart(.9*s,.18*s,.7*s, P.bone); bk.position.set(0,1.42*s,-.15*s); g.add(bk);
+  }
+  const armL = boxTex(.22*s,.6*s,.22*s, mLimb); armL.geometry.translate(0,-.2*s,0); armL.position.set(-(.3+bw*.32)*s,1.05*s,.3*s);
+  const armR = armL.clone(); armR.position.x = (.3+bw*.32)*s;
+  if (variant==='stalker'){ armL.scale.y = 1.45; }                  // 潜行者长臂垂地
+  /* 爪尖 */
+  const cl = boxPart(.26*s,.26*s,.26*s, 0x22242c); cl.position.y = variant==='stalker'?-.78*s:-.5*s; armL.add(cl);
+  const cl2 = cl.clone(); armR.add(cl2);
+  const legL = boxTex(.3*s,.62*s,.34*s, mLimb); legL.geometry.translate(0,-.26*s,0); legL.position.set(-.26*s,.6*s,-.1*s);
+  const legR = legL.clone(); legR.position.x=.26*s;
+  if (variant==='wing'){ legL.scale.y = legR.scale.y = .55; }       // 飞翼兽收腿
+  const tail = boxTex(.18*s,.18*s,.8*s, mLimb); tail.position.set(0,.9*s,-.85*s); tail.rotation.x=.25;
+  g.add(armL,armR,legL,legR,tail);
+  let wL = null, wR = null;
+  if (variant==='wing'){                                           // 膜翼（根部为轴，扑动）
+    const mWing = skinMat('kj-wing-membrane', gg=>{
+      pnoise(gg, 0x241d3d, .18, 30, 41);
+      gg.fillStyle = shade(css(0x241d3d), .3);                     // 翼膜脉络
+      gg.fillRect(7,0,1,16); gg.fillRect(3,0,1,10); gg.fillRect(12,0,1,10);
+    });
+    wL = boxTex(1.1*s,.06*s,.6*s, mWing); wL.geometry.translate(-.55*s,0,0); wL.position.set(-.45*s,1.25*s,.05*s);
+    wR = boxTex(1.1*s,.06*s,.6*s, mWing); wR.geometry.translate(.55*s,0,0); wR.position.set(.45*s,1.25*s,.05*s);
+    wL.material.emissive.setHex(0x0a0618); wR.material.emissive.setHex(0x0a0618);
+    const st = boxPart(.1*s,.1*s,.34*s, 0x8dff2f, 0x1a3310); st.position.set(0,1.05*s,-1.2*s); // 尾刺
+    g.add(wL,wR,st);
+  }
+  return {group:g, legL,legR,armL,armR, tail, wL,wR, scl:s, mouthY:1.3, eyeMats:[e1.material], eyeHex:P.eye};
+}
+function makeWyvern(scale){
+  /* Boss·翼龙：会飞的大鸟，俯冲发射光束 */
+  const g = new THREE.Group(); const s = scale;
+  const mBody = skinMat('kj-wyv-body', gg=>{
+    pnoise(gg, 0x6a2f4f, .15, 40, 51);
+    gg.fillStyle = shade(css(0x6a2f4f), .2);
+    for (let y=1;y<16;y+=4) gg.fillRect(0,y,16,1);               // 羽毛层叠条纹
+  });
+  const mHead = skinMat('kj-wyv-head', gg=> pnoise(gg, 0x7a3a5e, .14, 30, 52));
+  const mWing = skinMat('kj-wyv-wing', gg=>{
+    pnoise(gg, 0x8f3a63, .16, 36, 53);
+    gg.fillStyle = shade(css(0x8f3a63), .28); gg.fillRect(7,0,1,16); gg.fillRect(3,0,1,10); gg.fillRect(12,0,1,10); // 翼膜脉络
+  });
+  const b = boxTex(.6*s,.5*s,1.2*s, mBody); g.add(b);
+  const neck = boxTex(.3*s,.3*s,.5*s, mHead); neck.position.set(0,.2*s,.75*s); neck.rotation.x=-.2; g.add(neck);
+  const head = boxTex(.38*s,.32*s,.6*s, mHead); head.position.set(0,.35*s,1.1*s); g.add(head);
+  const beak = boxPart(.16*s,.12*s,.3*s, 0xd8a13a); beak.position.set(0,.3*s,1.5*s); g.add(beak);
+  const e1 = boxPart(.09*s,.06*s,.02*s,0x000000,0xffe23a); e1.position.set(-.12*s,.42*s,1.35*s); e1.material.__keepGlow=true; g.add(e1);
+  const e2 = e1.clone(); e2.position.x=.12*s; g.add(e2);
+  const crest = boxPart(.08*s,.3*s,.3*s, 0xd8a13a); crest.position.set(0,.62*s,.95*s); g.add(crest);
+  const tail = boxTex(.24*s,.18*s,1.1*s, mBody); tail.position.set(0,.05*s,-1.1*s); tail.rotation.x=.12; g.add(tail);
+  const wL = boxTex(2.2*s,.07*s,.8*s, mWing); wL.geometry.translate(-1.1*s,0,0); wL.position.set(-.3*s,.25*s,-.1*s);
+  const wR = boxTex(2.2*s,.07*s,.8*s, mWing); wR.geometry.translate(1.1*s,0,0); wR.position.set(.3*s,.25*s,-.1*s);
+  g.add(wL,wR);
+  const legL = boxPart(.14*s,.4*s,.14*s, 0x5a2440); legL.geometry.translate(0,-.16*s,0); legL.position.set(-.18*s,.15*s,.3*s);
+  const legR = legL.clone(); legR.position.x=.18*s; g.add(legL,legR);
+  return {group:g, legL,legR, armL:legL, armR:legR, wL,wR, scl:s, mouthY:1.4, eyeMats:[e1.material], eyeHex:0xffe23a};
+}
+function makeGolem(scale){
+  /* Boss·岩石魔像：重甲缓慢，胸口绿芯，也会放光束 */
+  const g = new THREE.Group(); const s = scale;
+  const mStone = skinMat('kj-golem-body', gg=>{
+    pnoise(gg, 0x6e6a60, .13, 36, 61);
+    gg.fillStyle = shade(css(0x6e6a60), -.32);                   // 岩石裂纹
+    gg.fillRect(3,2,1,4); gg.fillRect(4,5,2,1); gg.fillRect(10,7,1,5); gg.fillRect(9,11,2,1); gg.fillRect(6,12,1,3);
+    gg.fillStyle = '#4a7a3a'; gg.fillRect(12,1,2,1); gg.fillRect(1,13,2,1);   // 苔藓
+  });
+  const mStone2 = skinMat('kj-golem-head', gg=> pnoise(gg, 0x7a766b, .13, 30, 62));
+  const mStone3 = skinMat('kj-golem-limb', gg=> pnoise(gg, 0x5c5850, .15, 34, 63));
+  const body = boxTex(1.3*s,1.5*s,.9*s, mStone); body.position.y=1.6*s; g.add(body);
+  const core = boxPart(.34*s,.34*s,.1*s, 0x000000, 0x3affc8); core.position.set(0,1.8*s,.46*s); g.add(core);
+  const head = boxTex(.6*s,.5*s,.55*s, mStone2); head.position.set(0,2.6*s,.1*s); g.add(head);
+  const e1 = boxPart(.12*s,.06*s,.02*s,0x000000,0x3affc8); e1.position.set(-.14*s,2.66*s,.39*s); e1.material.__keepGlow=true; g.add(e1);
+  const e2 = e1.clone(); e2.position.x=.14*s; g.add(e2);
+  const armL = boxTex(.42*s,1.2*s,.45*s, mStone3); armL.geometry.translate(0,-.5*s,0); armL.position.set(-.9*s,2.1*s,0);
+  const armR = armL.clone(); armR.position.x=.9*s; g.add(armL,armR);
+  const shL = boxTex(.5*s,.25*s,.6*s, mStone2); shL.position.set(-.9*s,2.35*s,0); g.add(shL);
+  const shR = shL.clone(); shR.position.x=.9*s; g.add(shR);
+  const legL = boxTex(.45*s,.9*s,.5*s, mStone3); legL.geometry.translate(0,-.4*s,0); legL.position.set(-.32*s,.85*s,0);
+  const legR = legL.clone(); legR.position.x=.32*s; g.add(legL,legR);
+  return {group:g, legL,legR,armL,armR, wL:null,wR:null, scl:s, mouthY:1.9, eyeMats:[e1.material], eyeHex:0x3affc8};
+}
+
+/* ---------- 玩家 ---------- */
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3();    // 帧循环复用临时向量（勿跨嵌套调用持有）
+const player = {
+  pos: new THREE.Vector3(WORLD/2+.5, 30, WORLD/2+.5),
+  vel: new THREE.Vector3(),
+  onGround: false,
+  yaw: 0, pitch: -.35,
+  hp: 20, maxHp: 20,
+  energy: 0,
+  giant: false,
+  huge: false,                                                 // 巨大化：体型再膨胀3.2倍（比超级巨兽还大）
+  kills: 0,
+  inv: {1:16, 2:16, 3:16, 4:8, 5:8, 6:12, 7:16},   // 初始：各给一点，光石16
+  slot: 0, // PLACEABLE 索引
+  w: .3, hNorm: 1.7,
+  modelN: null, modelG: null,
+  group: null,
+  headPos(){ const h = this.giant?(this.huge?16.0:5.0):1.62; return new THREE.Vector3(this.pos.x, this.pos.y+h, this.pos.z); },
+  dims(){ const gk = this.giant ? (this.huge?3.2:1) : 1; return {hw: this.giant?.85*gk:.3, h: this.giant?5.0*gk:1.7}; },
+};
+player.modelN = makeHumanoid({head:0xe8b98a, torso:0x2fa3a8, arm:0xe8b98a, leg:0x35507a, scale:1});
+player.modelG = makeHumanoid({head:0xd7dbe4, torso:0xd73434, arm:0xd7dbe4, leg:0xd73434, scale:2.9,
+  crest:0xf3d64a, eye:0x7ce8ff, chest:0x36c6ff});
+player.group = player.modelN.group; scene.add(player.group);
+player.modelN.group.rotation.order = 'YXZ';
+player.modelG.group.rotation.order = 'YXZ';
+
+/* ---------- 输入 ---------- */
+const keys = {};
+addEventListener('keydown', e=>{
+  keys[e.code]=true;
+  if (e.code==='KeyT') tryTransform();
+  if (e.code==='KeyF' && !e.repeat && player.giant){          // 点按F：黄色能量炮弹单手即发（左右手交替）；按住进入2秒蓄力→红激光（仅巨人形态，人形态无音效无动作）
+    beamSide *= -1;
+    fireEnergyBall(beamSide>0 ? 'right' : 'left');
+    fHoldT = 0; channelT = .45;
+    SFX.charge();
+  }
+  if (e.code==='KeyV' && !e.repeat && player.giant){ vHoldT = 0; SFX.kcharge(); }  // 按住蓄力1.5s自动起脚；提前松开=快速飞踢（仅巨人形态）
+  if (e.code==='KeyR' && !e.repeat) tryPunch();                // 巨人拳击三连段（人形态无效）
+  if (e.code==='KeyB' && !e.repeat) toggleHuge();              // 巨大化（仅巨人形态）
+  if (e.code==='KeyG') toggleGun();
+  if (e.code==='KeyM'){ muted = !muted; beamLoopStop(); flashMsg(muted ? '🔇 已静音' : '🔊 声音开启'); }
+  const n = parseInt(e.key);
+  if (n>=1 && n<=PLACEABLE.length){ player.slot = n-1; refreshHotbar(); }
+});
+addEventListener('keyup', e=>{ keys[e.code]=false;
+  if (e.code==='KeyF'){ fHoldT = -1; beamLoopStop(); }
+  if (e.code==='KeyV'){ if (vHoldT>=0 && vHoldT<1.5) tryKick(false); vHoldT = -1; }   // 未蓄满松开=快速踢
+});
+canvas.addEventListener('click', ()=>{ if (started && !dead) {
+  // Chrome 在 Esc 退出后约 1.3 秒内会拒绝重新锁定，静默吞掉拒绝（再点一次即可）
+  const p = canvas.requestPointerLock();
+  if (p && p.catch) p.catch(()=>{});
+}});
+document.addEventListener('pointerlockchange', ()=>{
+  paused = !document.pointerLockElement && started;
+  firing = false;                                   // 失去鼠标锁立即停火
+  document.getElementById('pauseTip').style.display = (paused && !dead && started) ? 'block' : 'none';
+});
+let paused = false, started = false;
+addEventListener('mousemove', e=>{
+  if (document.pointerLockElement !== canvas) return;
+  if (kickT > 0) return;                             // 飞踢冲刺中锁视角：双脚始终对准锁定目标
+  player.yaw -= e.movementX * .0026;
+  player.pitch = Math.max(-1.25, Math.min(1.25, player.pitch - e.movementY*.0026));
+});
+addEventListener('mousedown', e=>{
+  if (document.pointerLockElement !== canvas) return;
+  if (e.button===0){
+    if (gunMode && !player.giant) firing = true;      // 机枪：按住连发（人类形态）
+    else if (player.giant) lockTarget();              // 巨人：左键锁定准星命中区域，再按 V 飞踢
+    else leftAction();
+  }
+  if (e.button===2) rightAction();
+});
+addEventListener('mouseup', e=>{ if (e.button===0) firing = false; });
+addEventListener('contextmenu', e=>e.preventDefault());
+
+/* ---------- 机关枪（无限子弹） ---------- */
+let gunMode = false, firing = false, gunCd = 0;
+let fHoldT = -1, channelT = 0, lastBeamHand = 'both';          // 长按F=双手激光2秒蓄力；点按F=单手即发（左右交替）
+let beamSide = 1, kickT = 0, kickCd = 0;                       // 飞踢：kickT>0 冲刺+无敌中
+const kickDir = new THREE.Vector3();
+let kickHit = null;
+const lastKickPos = new THREE.Vector3();                        // 检测冲刺是否被地形卡住
+let vHoldT = -1, kickCharged = false, kickSpd = 34;             // 按住V蓄力1.5s=蓄力飞踢；快速踢冷却仅1.2s可连用
+let lastHitSfxT = 0;                                            // 命中音节流（120ms 内不重复）
+let kickRingT = 0;                                             // 飞踢沿途湮灭环的节拍器
+let lockPoint = null;                                          // 左键锁定的飞踢目标点（世界坐标）
+const lockMark = new THREE.Group();                            // 锁定标记：旋转准星圈
+{
+  const lm = new THREE.MeshBasicMaterial({color:0xff4b3b, transparent:true, opacity:.9, blending:THREE.AdditiveBlending, depthWrite:false});
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(.9, .07, 8, 24), lm);
+  const bar1 = new THREE.Mesh(new THREE.BoxGeometry(2.2, .09, .09), lm);
+  const bar2 = bar1.clone(); bar2.rotation.z = Math.PI/2;
+  lockMark.add(ring, bar1, bar2);
+  lockMark.visible = false; scene.add(lockMark);
+}
+function lockTarget(){
+  if (!started || dead || !player.giant || kickT > 0) return;   // 冲刺中不换目标（到点判定会错乱）
+  ray.set(player.headPos(), camDir()); ray.far = 70;           // 先看怪兽（直接锁到怪身上），再落到准星命中的方块
+  const boxes = monsters.map(m=>m.parts.group);
+  const hits = ray.intersectObjects(boxes, true);
+  lockPoint = null;
+  if (hits.length){
+    let o = hits[0].object; while (o.parent && !boxes.includes(o)) o = o.parent;
+    const bi = boxes.indexOf(o);
+    if (bi >= 0){
+      const m = monsters[bi];
+      lockPoint = m.pos.clone().add(new THREE.Vector3(0, m.h*.45, 0));
+    }
+  }
+  if (!lockPoint){
+    const hit = blockHitFrom(player.headPos(), camDir(), 70);
+    if (!hit){ lockMark.visible = false; flashMsg('🎯 准星 70 格内没有可锁定的区域'); return; }   // 失败：清掉旧标记，别残留上一个锁定点
+    lockPoint = new THREE.Vector3(hit.x+.5, hit.y+.5, hit.z+.5);
+  }
+  lockMark.position.copy(lockPoint);
+  lockMark.visible = true;
+  SFX.lock();
+  flashMsg('🎯 已锁定目标！按 V 巨人飞踢');
+}
+const GUN_RATE = .12;          // 射速：约 8 发/秒
+const GUN_RANGE = 45;
+const tracers = [];
+function toggleGun(){
+  if (!started || dead) return;
+  gunMode = !gunMode; firing = false;
+  document.getElementById('weaponTxt').textContent = gunMode ? '🔫 机枪模式（按住左键连发·无限子弹；G 切回拳头挖方块）' : '👊 拳模式（按 G 换机枪）';
+  document.getElementById('cross').style.color = gunMode ? '#ffd75e' : 'rgba(255,255,255,.85)';
+  flashMsg(gunMode ? '🔫 机枪就绪：按住左键倾泻火力！' : '👊 切回拳头：可以挖方块了');
+}
+function tracerLine(from, to){
+  const g = new THREE.BufferGeometry().setFromPoints([from, to]);
+  const m = new THREE.LineBasicMaterial({color:0xffe08a, transparent:true, opacity:.95});
+  const line = new THREE.Line(g, m);
+  scene.add(line); tracers.push({line, t:.09});
+}
+function shoot(){
+  SFX.shoot();
+  const origin = player.headPos();
+  const dir = camDir();
+  poof(origin.clone().addScaledVector(dir, 1.3), 0xffe08a, 1);   // 枪口火花
+  dir.x += (Math.random()-.5)*.028; dir.y += (Math.random()-.5)*.028; dir.z += (Math.random()-.5)*.028;
+  dir.normalize();
+  // 命中检测：打怪兽和动物（数量少，射线开销可忽略）
+  ray.set(origin, dir); ray.far = GUN_RANGE;
+  const boxes = [...monsters.map(m=>m.parts.group), ...fauna.map(f=>f.parts.group)];
+  const hits = ray.intersectObjects(boxes, true);
+  let end = origin.clone().addScaledVector(dir, GUN_RANGE);
+  if (hits.length){
+    end = hits[0].point;
+    let o = hits[0].object; while (o.parent && !boxes.includes(o)) o = o.parent;
+    const bi = boxes.indexOf(o);
+    if (bi >= 0){
+      if (bi < monsters.length){
+        const m = monsters[bi];
+        if (m.boss || m.mega) m.provoked = true;
+        m.hp -= player.giant ? 3 : 1;
+        m.hurtT = .15;
+        m.vel.addScaledVector(dir, 2.5).y += 1.2;   // 轻微击退
+        if (m.hp <= 0) killMonster(m, bi);
+        else poof(end, 0xff6a5e, 2);                 // 命中火花
+      } else killFauna(fauna[bi-monsters.length], bi-monsters.length);
+    }
+  }
+  tracerLine(origin.clone().add(new THREE.Vector3(0,-.15,0)).addScaledVector(dir,.8), end);
+  poof(origin.clone().addScaledVector(dir,.7), 0xffe08a, 1); // 枪口火光
+}
+
+function camDir(){
+  const d = new THREE.Vector3(0,0,-1);
+  d.applyEuler(new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ'));
+  return d;
+}
+
+/* ---------- 实体物理（AABB vs 体素） ---------- */
+function moveEntity(ent, dt, hw, h){
+  const p = ent.pos;
+  if (!ent.noGravity) ent.vel.y -= 24*dt;            // 重力（巨人飞行时关掉）
+  if (ent.vel.y < -40) ent.vel.y = -40;
+  const move = ent.vel.clone().multiplyScalar(dt);
+  // 分轴移动 + 碰撞
+  const collide = (px,py,pz)=>{
+    for (let x=Math.floor(px-hw); x<=Math.floor(px+hw); x++)
+      for (let z=Math.floor(pz-hw); z<=Math.floor(pz+hw); z++)
+        for (let y=Math.floor(py); y<=Math.floor(py+h); y++)
+          if (SOLID.has(getB(x,y,z))) return true;
+    return false;
+  };
+  const step = (axis, delta)=>{
+    if (!delta) return;
+    const old = p[axis]; p[axis]+=delta;
+    if (collide(p.x,p.y,p.z)){
+      p[axis]=old;
+      if (axis==='y'){ if (delta<0) ent.onGround=true; ent.vel.y=0; }
+      else ent.vel[axis==='x'?'x':'z']=0;
+      // 自动上台阶（1格）
+      if (axis!=='y' && ent.canStep && !collide(p.x, p.y+1.05, p.z)){
+        p.y += 1.05;
+      }
+    }
+  };
+  ent.onGround = false;
+  step('x', move.x); step('z', move.z); step('y', move.y);
+  // 掉出世界底部 → 拉回地表
+  if (p.y < -8){ p.set(WORLD/2+.5, hmap[(WORLD/2)*WORLD+(WORLD/2)]+2, WORLD/2+.5); ent.vel.set(0,0,0); }
+  // 岛外限制
+  p.x = Math.max(.7, Math.min(WORLD-.7, p.x));
+  p.z = Math.max(.7, Math.min(WORLD-.7, p.z));
+}
+function onSurfaceY(x,z,fromY){                              // fromY：从哪个高度往下找地表（有天堂后必须带语境）
+  const y0 = fromY===undefined ? HEIGHT-1 : Math.min(HEIGHT-1, Math.floor(fromY)+2);
+  for (let y=y0;y>=0;y--) if (SOLID.has(getB(Math.floor(x),y,Math.floor(z)))) return y+1;
+  return WATER+2;
+}
+
+/* ---------- 怪兽 ---------- */
+const monsters = [];
+/* 头顶血条（Sprite + Canvas，血量变化时才重绘纹理） */
+function makeHpBar(scale){
+  const cv = document.createElement('canvas'); cv.width = 64; cv.height = 10;
+  const tex = new THREE.CanvasTexture(cv); tex.minFilter = THREE.LinearFilter;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, depthTest:false, transparent:true}));
+  sp.scale.set(1.5*scale, .22*scale, 1);
+  return {cv, ctx:cv.getContext('2d'), tex, sp};
+}
+function drawHpBar(bar, hp, maxHp, elite){
+  const g = bar.ctx; g.clearRect(0,0,64,10);
+  g.fillStyle = 'rgba(0,0,0,.65)'; g.fillRect(0,2,64,6);
+  const pct = Math.max(0, hp/maxHp);
+  g.fillStyle = pct>.5 ? '#4be04b' : pct>.25 ? '#ffd75e' : '#ff4b4b';
+  g.fillRect(1,3, 62*pct, 4);
+  if (elite){ g.strokeStyle='#fff'; g.lineWidth=1; g.strokeRect(.5,.5,63,9); }
+  bar.tex.needsUpdate = true;
+}
+function spawnMonster(kind){
+  let x = 0, z = 0;
+  for (let t=0; t<7; t++){                                        // 圣域内不落怪：重挑落点（神殿周围怪兽止步）
+    const a = Math.random()*Math.PI*2, r = 16+Math.random()*12;
+    x = Math.max(2, Math.min(WORLD-2, player.pos.x + Math.cos(a)*r));
+    z = Math.max(2, Math.min(WORLD-2, player.pos.z + Math.sin(a)*r));
+    if (!inSanctuary(x,z)) break;
+  }
+  const mega = kind==='mega';
+  const boss = kind!=='normal';                                  // boss/翼龙/魔像都算 Boss 级
+  const variant = (!mega && kind==='normal')
+    ? ['stalker','runner','brute','wing','stalker','runner'][(Math.random()*6)|0] : null;
+  let scale, parts, st, fly = false, flyAlt = 0;
+  if (mega){
+    scale = 4.6; parts = makeKaiju(scale, 'mega', null);
+    st = {hp:300, dmg:12, spd:.9};
+  } else if (kind==='wyvern'){
+    scale = 1.7; parts = makeWyvern(scale);
+    st = {hp:60, dmg:4, spd:2.4}; fly = true; flyAlt = 8;
+  } else if (kind==='golem'){
+    scale = 2.0; parts = makeGolem(scale);
+    st = {hp:80, dmg:5, spd:1.0};
+  } else if (kind==='boss'){
+    scale = 1.9; parts = makeKaiju(scale, 'boss', null);
+    st = {hp:45, dmg:4, spd:1.6};
+  } else {
+    scale = variant==='brute' ? 1.25 : variant==='wing' ? .85 : variant==='runner' ? .8 : .9 + Math.random()*.35;
+    parts = makeKaiju(scale, 'normal', variant);
+    st = variant==='runner' ? {hp:4, dmg:2, spd:3.6+Math.random()*.6}
+       : variant==='brute' ? {hp:12, dmg:3, spd:1.4}
+       : variant==='wing' ? {hp:5, dmg:2, spd:2.6}
+       : {hp:6, dmg:2, spd:2.3+Math.random()*.8};
+    fly = variant==='wing'; flyAlt = 3.6;
+  }
+  const m = {
+    parts, pos:new THREE.Vector3(x, onSurfaceY(x,z,player.pos.y+8)+.05, z), vel:new THREE.Vector3(),
+    hp:st.hp, maxHp:st.hp, dmg:st.dmg, speed:st.spd,
+    hw:(mega?.8:kind==='golem'?.55:.45)*scale, h:1.6*scale, boss, mega, variant, fly, flyAlt,
+    atkCd:0, walk:Math.random()*6, canStep:true,
+    eCd:boss?2.5+Math.random()*2:0, chargeT:0,                   // Boss 级：远程光束
+  };
+  if (m.fly) m.noGravity = true;
+  m.bar = makeHpBar(scale);
+  drawHpBar(m.bar, m.hp, m.maxHp, boss||mega);
+  m.barHp = m.hp;
+  m.bar.sp.position.y = (mega?3.9:1.75)*scale + .55*scale;
+  parts.group.add(m.bar.sp);
+  parts.group.position.copy(m.pos);
+  scene.add(parts.group);
+  monsters.push(m);
+  monsterStormFx(m);                                               // 降临特效：乌云+闪电+雷鸣
+}
+/* ---------- 怪兽降临特效：Boss级=乌云聚集+三连闪电+雷鸣+闪屏；小怪=单道闪电提示 ---------- */
+const bolts = [], stormCloudsArr = [];
+const boltFlashEl = document.createElement('div');
+boltFlashEl.style.cssText = 'position:fixed;inset:0;background:rgba(200,228,255,.45);opacity:0;pointer-events:none;z-index:29';
+document.body.appendChild(boltFlashEl);
+function boltFlash(op){
+  boltFlashEl.style.transition = 'none'; boltFlashEl.style.opacity = op;
+  requestAnimationFrame(()=>{ boltFlashEl.style.transition = 'opacity .35s ease-out'; boltFlashEl.style.opacity = '0'; });
+}
+function lightningBolt(target){
+  const top = new THREE.Vector3(target.x + (Math.random()-.5)*12, 62, target.z + (Math.random()-.5)*12);
+  const pts = [];
+  for (let i=0;i<=7;i++){                                          // 锯齿折线：越高抖得越厉害
+    const t = i/7, j = (1-t)*3.2 + .5;
+    pts.push(new THREE.Vector3(
+      top.x + (target.x-top.x)*t + (Math.random()-.5)*j,
+      top.y + (target.y-top.y)*t,
+      top.z + (target.z-top.z)*t + (Math.random()-.5)*j));
+  }
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({color:0xeaf6ff, transparent:true, opacity:1}));
+  scene.add(line);
+  const light = borrowLight(0xbfe0ff, 5, 46, new THREE.Vector3(target.x, target.y+5, target.z), .4);
+  bolts.push({line, light: light.L, pit: light, t:.4});
+  SFX.crack();
+  poof(target, 0xbfe0ff, 5);
+}
+function stormClouds(target){
+  const g = new THREE.Group();
+  for (let i=0;i<9;i++){                                           // 九团压扁的深灰云盘旋在头顶30格
+    const puff = new THREE.Mesh(new THREE.SphereGeometry(3.5+Math.random()*3, 8, 6),
+      new THREE.MeshLambertMaterial({color:0x232833, transparent:true, opacity:0}));
+    puff.position.set((Math.random()-.5)*17, target.y + 30 + Math.random()*5, (Math.random()-.5)*17);
+    puff.scale.y = .45;
+    g.add(puff);
+  }
+  g.position.set(target.x, 0, target.z);
+  scene.add(g);
+  stormCloudsArr.push({g, t: 5.5});
+}
+function monsterStormFx(m){
+  if (m.boss || m.mega){                                           // Boss级：乌云+三连闪电+雷鸣+闪屏
+    stormClouds(m.pos);
+    lightningBolt(m.pos);
+    setTimeout(()=>{ if (started && !dead) lightningBolt(m.pos.clone().add(new THREE.Vector3((Math.random()-.5)*6, 0, (Math.random()-.5)*6))); }, 260);
+    setTimeout(()=>{ if (started && !dead){
+      lightningBolt(m.pos.clone().add(new THREE.Vector3((Math.random()-.5)*8, 0, (Math.random()-.5)*8)));
+      SFX.thunder(); boltFlash(.5);
+    } }, 560);
+  } else {                                                         // 小怪：一道快速闪电（无声闪屏轻闪）
+    lightningBolt(m.pos);
+    boltFlash(.15);
+  }
+}
+function killMonster(m, i){
+  scene.remove(m.parts.group); disposeGroup(m.parts.group);
+  m.bar.tex.dispose(); m.bar.sp.material.dispose();
+  monsters.splice(i,1);
+  player.kills++;
+  if (!m.boss && !m.mega) nightKills++;                        // 只有小怪击杀推高警戒
+  updateClock();
+  SFX.kill();
+  gainEnergy(m.mega?8:m.boss?5:m.variant==='brute'?2:1);
+  poof(m.pos, m.boss?0xffd75e:0x9f7cff, m.boss?40:16);
+}
+/* 打怪粒子 */
+const puffs = [];
+const POOF_GEO = new THREE.BoxGeometry(.12,.12,.12);            // 粒子共享几何体
+const poofMats = new Map();                                     // 颜色→共享材质（粒子只缩放不调透明度）
+function poofMat(color){
+  let m = poofMats.get(color);
+  if (!m){ m = new THREE.MeshBasicMaterial({color}); poofMats.set(color, m); }
+  return m;
+}
+function poof(pos, color, n){
+  if (puffs.length > 280) n = Math.min(n, 1);                    // 粒子池饱和时降级（防极端轰炸掉帧）
+  for (let i=0;i<n;i++){
+    const p = new THREE.Mesh(POOF_GEO, poofMat(color));          // 不再每颗粒子新建几何体+材质（高频调用曾造成 GC 卡顿）
+    p.position.copy(pos).add(new THREE.Vector3((Math.random()-.5)*1.2, Math.random()*1.6, (Math.random()-.5)*1.2));
+    p.userData.v = new THREE.Vector3((Math.random()-.5)*4, 2+Math.random()*3, (Math.random()-.5)*4);
+    scene.add(p); puffs.push({mesh:p, t:.9});
+  }
+}
+function burst(pos, color, n, spd){                              // 径向碎片飞溅：爆炸点炸出带重力旋转的小方块（体素游戏招牌）
+  if (puffs.length > 280) n = Math.min(n, 2);
+  for (let i=0;i<n;i++){
+    const p = new THREE.Mesh(POOF_GEO, poofMat(color));
+    p.position.copy(pos);
+    const a = Math.random()*Math.PI*2, e = Math.random()*Math.PI*.55;
+    p.userData.v = new THREE.Vector3(Math.cos(a)*Math.cos(e), Math.sin(e)+.3, Math.sin(a)*Math.cos(e))
+      .multiplyScalar(spd*(.45+Math.random()*.9));
+    p.userData.sz = 1.4+Math.random()*1.3;                       // 碎片比烟尘大，飞得更远
+    scene.add(p); puffs.push({mesh:p, t:.7+Math.random()*.35});
+  }
+}
+
+/* ---------- 动物 & 上界奇珍异兽（被动生物，可击杀；天界异兽+2能量） ---------- */
+const fauna = [];
+function makeRabbit(){
+  const g = new THREE.Group();
+  const body = boxPart(.42,.32,.55,0xe8e4da); body.position.y=.3; g.add(body);
+  const head = boxPart(.26,.26,.26,0xf2efe8); head.position.set(0,.52,.3); g.add(head);
+  const e1 = boxPart(.07,.26,.05,0xf2efe8); e1.position.set(-.08,.74,.3);
+  const e2 = e1.clone(); e2.position.x=.08; g.add(e1,e2);
+  const tail = boxPart(.14,.14,.14,0xffffff); tail.position.set(0,.36,-.3); g.add(tail);
+  const legL = boxPart(.1,.22,.1,0xd8d2c4); legL.geometry.translate(0,-.08,0); legL.position.set(-.13,.22,.18);
+  const legR = legL.clone(); legR.position.x=.13; g.add(legL,legR);
+  return {group:g, legL, legR};
+}
+function makeDeer(heaven){
+  const body = heaven?0xf4f8ff:0x9a6b45, limb = heaven?0xdfe9ff:0xb98a62;
+  const g = new THREE.Group();
+  const b = boxPart(.5,.5,.95,body); b.position.y=.85; g.add(b);
+  const neck = boxPart(.2,.5,.2,body); neck.position.set(0,1.25,.42); neck.rotation.x=-.4; g.add(neck);
+  const head = boxPart(.24,.24,.4,body); head.position.set(0,1.5,.62); g.add(head);
+  if (heaven){
+    const h1 = boxPart(.05,.34,.05,0xffe9a8); h1.position.set(-.09,1.82,.58); h1.rotation.z=.4;
+    const h2 = h1.clone(); h2.position.x=.09; h2.rotation.z=-.4; g.add(h1,h2);   // 发光鹿角
+    const e1 = boxPart(.05,.04,.02,0x000000,0x9ff0ff); e1.position.set(-.08,1.54,.83);
+    const e2 = e1.clone(); e2.position.x=.08; g.add(e1,e2);
+  }
+  const legL = boxPart(.11,.62,.11,limb); legL.geometry.translate(0,-.26,0); legL.position.set(-.18,.6,.32);
+  const legR = legL.clone(); legR.position.x=.18;
+  const legL2 = legL.clone(); legL2.position.z=-.32;
+  const legR2 = legR.clone(); legR2.position.z=-.32;
+  g.add(legL,legR,legL2,legR2);
+  return {group:g, legL,legR,legL2,legR2};
+}
+function makeGlowBird(){
+  const g = new THREE.Group();
+  const b = boxPart(.34,.26,.6,0x8fe4ff); g.add(b);
+  const head = boxPart(.2,.2,.2,0xd8f6ff); head.position.set(0,.14,.36); g.add(head);
+  const beak = boxPart(.08,.06,.12,0xffd75e); beak.position.set(0,.12,.5); g.add(beak);
+  const e1 = boxPart(.05,.04,.02,0x000000,0xff8adf); e1.position.set(-.06,.16,.47);
+  const e2 = e1.clone(); e2.position.x=.06; g.add(e1,e2);
+  const tail = boxPart(.2,.06,.3,0xffb0e8); tail.position.set(0,.05,-.42); g.add(tail);
+  const wL = boxPart(.5,.05,.3,0xc8f0ff); wL.geometry.translate(-.25,0,0); wL.position.set(-.17,.1,0);
+  const wR = boxPart(.5,.05,.3,0xc8f0ff); wR.geometry.translate(.25,0,0); wR.position.set(.17,.1,0);
+  g.add(wL,wR);
+  return {group:g, wL, wR};
+}
+function makeFox(){
+  const g = new THREE.Group();
+  const body = boxPart(.4,.34,.72,0xd96f2b); body.position.y=.36; g.add(body);
+  const head = boxPart(.28,.26,.3,0xe07c38); head.position.set(0,.56,.42); g.add(head);
+  const snout = boxPart(.14,.12,.16,0xf2e8dc); snout.position.set(0,.5,.62); g.add(snout);
+  const e1 = boxPart(.08,.16,.05,0xd96f2b); e1.position.set(-.09,.74,.4);
+  const e2 = e1.clone(); e2.position.x=.09; g.add(e1,e2);
+  const tail = boxPart(.16,.16,.5,0xd96f2b); tail.position.set(0,.44,-.55); tail.rotation.x=.35; g.add(tail);
+  const tip = boxPart(.17,.17,.16,0xf2e8dc); tip.position.set(0,.58,-.75); g.add(tip);
+  const legL = boxPart(.09,.26,.09,0x5a3a1c); legL.geometry.translate(0,-.1,0); legL.position.set(-.13,.26,.24);
+  const legR = legL.clone(); legR.position.x=.13;
+  const legL2 = legL.clone(); legL2.position.z=-.24;
+  const legR2 = legR.clone(); legR2.position.z=-.24;
+  g.add(legL,legR,legL2,legR2);
+  return {group:g, legL,legR,legL2,legR2};
+}
+function makeUnicorn(){
+  const g = new THREE.Group();
+  const b = boxPart(.55,.55,1.05,0xf6f8ff); b.position.y=.95; g.add(b);
+  const neck = boxPart(.22,.55,.22,0xf6f8ff); neck.position.set(0,1.32,.42); neck.rotation.x=-.35; g.add(neck);
+  const head = boxPart(.26,.26,.44,0xf6f8ff); head.position.set(0,1.62,.6); g.add(head);
+  const horn = boxPart(.06,.4,.06,0xffe08a,0xa87c1f); horn.position.set(0,1.98,.66); horn.rotation.x=-.25; g.add(horn);
+  const mane = boxPart(.1,.4,.3,0xc8f0ff,0x184a5e); mane.position.set(0,1.4,.24); mane.rotation.x=-.35; g.add(mane);
+  const e1 = boxPart(.05,.04,.02,0x000000,0x8fc8ff); e1.position.set(-.08,1.66,.83);
+  const e2 = e1.clone(); e2.position.x=.08; g.add(e1,e2);
+  const legL = boxPart(.12,.66,.12,0xe8ecf8); legL.geometry.translate(0,-.28,0); legL.position.set(-.18,.62,.34);
+  const legR = legL.clone(); legR.position.x=.18;
+  const legL2 = legL.clone(); legL2.position.z=-.34;
+  const legR2 = legR.clone(); legR2.position.z=-.34;
+  g.add(legL,legR,legL2,legR2);
+  return {group:g, legL,legR,legL2,legR2};
+}
+function makeButterfly(glow){
+  const g = new THREE.Group();
+  const c = glow?0x9fe8ff:0xffb0e8;
+  const b = boxPart(.09,.09,.22, glow?0xd8f6ff:0x5a4632); g.add(b);
+  const wL = boxPart(.26,.03,.3, c, glow?0x1a4a66:0x000000); wL.geometry.translate(-.14,0,0); wL.position.set(-.05,.03,0);
+  const wR = boxPart(.26,.03,.3, c, glow?0x1a4a66:0x000000); wR.geometry.translate(.14,0,0); wR.position.set(.05,.03,0);
+  g.add(wL,wR);
+  return {group:g, wL, wR};
+}
+function makePhoenix(){
+  const g = new THREE.Group();
+  const b = boxPart(.4,.3,.7,0xe84a2a); g.add(b);
+  const head = boxPart(.24,.24,.24,0xff8a3d); head.position.set(0,.18,.42); g.add(head);
+  const crest = boxPart(.06,.22,.14,0xffd75e); crest.position.set(0,.4,.38); g.add(crest);
+  const beak = boxPart(.09,.06,.12,0xffe08a); beak.position.set(0,.14,.56); g.add(beak);
+  const e1 = boxPart(.05,.04,.02,0x000000,0xfff2b8); e1.position.set(-.07,.2,.53);
+  const e2 = e1.clone(); e2.position.x=.07; g.add(e1,e2);
+  const tail = boxPart(.14,.05,.9,0xff9a3d); tail.position.set(0,.02,-.75); tail.rotation.x=.22; g.add(tail);
+  const t2 = boxPart(.1,.04,.7,0xffd75e,0x7c4a00); t2.position.set(0,-.06,-.9); t2.rotation.x=.35; g.add(t2);
+  const t3 = boxPart(.08,.04,.55,0xff5b2a); t3.position.set(.07,-.12,-.95); t3.rotation.x=.45; t3.rotation.y=.12; g.add(t3);
+  const t4 = t3.clone(); t4.position.x=-.07; t4.rotation.y=-.12; g.add(t4);
+  const wL = boxPart(1.0,.05,.42,0xffb43d); wL.geometry.translate(-.5,0,0); wL.position.set(-.2,.12,.05);
+  const wR = boxPart(1.0,.05,.42,0xffb43d); wR.geometry.translate(.5,0,0); wR.position.set(.2,.12,.05);
+  g.add(wL,wR);
+  return {group:g, wL, wR};
+}
+function spawnFauna(kind, x, z, y){
+  const heaven = kind==='hdeer'||kind==='bird'||kind==='gbfly'||kind==='unicorn'||kind==='phoenix';
+  const flying = kind==='bird'||kind==='bfly'||kind==='gbfly'||kind==='phoenix';
+  let parts;
+  if (kind==='rabbit') parts = makeRabbit();
+  else if (kind==='deer') parts = makeDeer(false);
+  else if (kind==='hdeer') parts = makeDeer(true);
+  else if (kind==='fox') parts = makeFox();
+  else if (kind==='unicorn') parts = makeUnicorn();
+  else if (kind==='bfly') parts = makeButterfly(false);
+  else if (kind==='gbfly') parts = makeButterfly(true);
+  else if (kind==='phoenix') parts = makePhoenix();
+  else parts = makeGlowBird();
+  const tiny = kind==='bfly'||kind==='gbfly';
+  const f = {kind, parts, heaven,
+    pos:new THREE.Vector3(x, y!==undefined?y:onSurfaceY(x,z,60)+.05, z),
+    vel:new THREE.Vector3(), heading:Math.random()*Math.PI*2, timer:1+Math.random()*3,
+    hw:kind==='rabbit'?.18 : tiny?.1 : .3,
+    h:kind==='rabbit'?.5 : tiny?.2 : kind==='unicorn'?1.8:1.5, canStep:true};
+  if (flying){
+    f.orbit = {cx:x, cz:z,
+               r:kind==='bird' ? 8+Math.random()*10 : kind==='phoenix' ? 9+Math.random()*7 : 2+Math.random()*3.5,
+               ang:Math.random()*Math.PI*2,
+               spd:kind==='bird' ? .5+Math.random()*.5 : kind==='phoenix' ? .35+Math.random()*.2 : .9+Math.random()*.7};
+    f.baseY = kind==='bird' ? 96+Math.random()*14 : (y!==undefined ? y : player.pos.y+3);
+    f.pos.set(x, f.baseY, z);
+    f.noGravity = true;
+  }
+  parts.group.position.copy(f.pos);
+  scene.add(parts.group);
+  fauna.push(f);
+  return f;
+}
+let faunaCd = 0;
+function faunaTick(dt, now){
+  faunaCd -= dt;
+  if (faunaCd<=0){                                            // 维持玩家身边的动物数量
+    faunaCd = 1.5;
+    const inHeaven = player.pos.y > HEAVEN_Y-16;
+    const want = inHeaven ? {hdeer:6, bird:8, unicorn:3, gbfly:14, phoenix:2}
+                          : {rabbit:12, deer:6, fox:6, bfly:16};
+    const have = {};
+    for (const f of fauna) have[f.kind]=(have[f.kind]||0)+1;
+    for (const k of Object.keys(want)){
+      if ((have[k]||0) >= want[k] || Math.random()>=.6) continue;
+      const a = Math.random()*Math.PI*2, r = 24+Math.random()*34;
+      const x = Math.max(4, Math.min(WORLD-4, player.pos.x+Math.cos(a)*r));
+      const z = Math.max(4, Math.min(WORLD-4, player.pos.z+Math.sin(a)*r));
+      if (inHeaven){
+        const sy = onSurfaceY(x,z,HEAVEN_Y+6);
+        if (sy < HEAVEN_Y-6) continue;
+        if (k==='bird') spawnFauna('bird', x, z);
+        else if (k==='gbfly') spawnFauna('gbfly', x, z, sy+2+Math.random()*4);
+        else if (k==='phoenix') spawnFauna('phoenix', x, z, sy+6+Math.random()*7);
+        else spawnFauna('hdeer', x, z, sy+.05);
+      } else {
+        const sy = onSurfaceY(x,z,player.pos.y+6);
+        if (sy<=WATER+2 || sy>=38) continue;
+        if (k==='bfly') spawnFauna('bfly', x, z, sy+1.5+Math.random()*2.5);
+        else spawnFauna(k, x, z, sy+.05);
+      }
+    }
+  }
+  for (let i=fauna.length-1;i>=0;i--){
+    const f = fauna[i];
+    const dP = f.pos.distanceTo(player.pos);
+    if (dP>130){ disposeGroup(f.parts.group); scene.remove(f.parts.group); fauna.splice(i,1); continue; }
+    if (f.orbit){                                             // 飞行类：绕锚点盘旋 + 振翅
+      const o = f.orbit;
+      o.ang += dt*o.spd;
+      const nx = o.cx + Math.cos(o.ang)*o.r, nz = o.cz + Math.sin(o.ang)*o.r;
+      f.vel.set((nx-f.pos.x)/Math.max(dt,1e-4), 0, (nz-f.pos.z)/Math.max(dt,1e-4));
+      f.pos.set(nx, f.baseY + Math.sin(now*.0012 + o.ang*2)*2.2, nz);
+      f.parts.group.rotation.y = Math.atan2(f.vel.x, f.vel.z);
+      const flap = Math.sin(now*(f.kind==='bird'?.02:.03))*(f.kind==='bird'?.95:1.15);
+      f.parts.wL.rotation.z = flap; f.parts.wR.rotation.z = -flap;
+      if (f.kind==='phoenix' && Math.random()<dt*.6) poof(f.pos.clone().add(new THREE.Vector3(0,-.1,0)), Math.random()<.5?0xff9a3d:0xffd75e, 2);  // 凤凰拖尾火星
+    } else {
+      f.timer -= dt;
+      if (f.timer<=0){ f.timer = 1.5+Math.random()*3; f.heading = Math.random()*Math.PI*2; }
+      let spd = 0;
+      if (dP < (f.kind==='rabbit'?5:6)){                       // 玩家靠近就逃
+        f.heading = Math.atan2(f.pos.x-player.pos.x, f.pos.z-player.pos.z);
+        spd = f.kind==='rabbit'?6.2:5.2;
+      } else if (f.timer>1.2) spd = 1.1;                       // 慢速闲逛
+      f.vel.x = Math.sin(f.heading)*spd; f.vel.z = Math.cos(f.heading)*spd;
+      moveEntity(f, dt, f.hw, f.h);
+      if (f.kind==='rabbit' && spd>2 && f.onGround && Math.random()<dt*3.2) f.vel.y = 5.4;  // 蹦跶
+      f.parts.group.rotation.y = f.heading;
+      const sw = spd>2 ? Math.sin(now*.025)*.7 : Math.sin(now*.008)*.15;
+      f.parts.legL.rotation.x=sw; f.parts.legR.rotation.x=-sw;
+      if (f.parts.legL2){ f.parts.legL2.rotation.x=-sw; f.parts.legR2.rotation.x=sw; }
+    }
+    f.parts.group.position.copy(f.pos);
+  }
+}
+function killFauna(f, i){
+  scene.remove(f.parts.group); disposeGroup(f.parts.group);
+  fauna.splice(i,1);
+  SFX.kill();
+  if (f.kind==='phoenix'){ gainEnergy(3); flashMsg('🔥 凤凰之灵 +3 能量'); }
+  else if (f.heaven){ gainEnergy(2); flashMsg('✨ 天界异兽之灵 +2 能量'); }
+  poof(f.pos, f.heaven?0xaef4ff:0xffffff, f.heaven?18:10);
+}
+
+/* ---------- 湮灭特效：激光/炮弹/飞踢命中的三层爆点——闪爆核心 + 水平冲击波环 + 径向碎片 ----------
+   网格池化：预建10组循环复用，战斗高频命中不再每次新建/销毁几何体（GC+GPU缓冲churn=卡帧） ---------- */
+const rings = [];
+const ANN_CORE_GEO = new THREE.SphereGeometry(.4, 12, 10);
+const ANN_WAVE_GEO = new THREE.RingGeometry(.55, .8, 24);
+const annPool = {cores:[], waves:[]};
+for (let i=0;i<10;i++){
+  const c = new THREE.Mesh(ANN_CORE_GEO,
+    new THREE.MeshBasicMaterial({transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false}));
+  c.visible = false; scene.add(c);
+  annPool.cores.push({mesh:c, free:true});
+  const w = new THREE.Mesh(ANN_WAVE_GEO,
+    new THREE.MeshBasicMaterial({transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide}));
+  w.rotation.x = -Math.PI/2; w.visible = false; scene.add(w);
+  annPool.waves.push({mesh:w, free:true});
+}
+function annihilate(pos, color, quiet){
+  const core = annPool.cores.find(x=>x.free) || annPool.cores[0];
+  core.free = false; core.mesh.visible = true;
+  core.mesh.material.color.setHex(color);
+  core.mesh.position.copy(pos); core.mesh.scale.setScalar(1);
+  rings.push({mesh:core.mesh, item:core, t:.45, dur:.45, grow:22, op:.9});
+  const wave = annPool.waves.find(x=>x.free) || annPool.waves[0];
+  wave.free = false; wave.mesh.visible = true;
+  wave.mesh.material.color.setHex(color);
+  wave.mesh.position.copy(pos); wave.mesh.scale.setScalar(1);
+  rings.push({mesh:wave.mesh, item:wave, t:.4, dur:.4, grow:26, op:.85});   // 水平冲击波环贴地扩散
+  burst(pos, color, 9, 7);
+  poof(pos, color, 8);
+  if (!quiet) SFX.anni();
+}
+/* ---------- 屏幕震动：爆炸/重击的镜头冲击（幅度快速衰减，Vlambeer 式 game feel） ---------- */
+let shakeAmp = 0;
+function shake(a){ shakeAmp = Math.min(1, shakeAmp + a); }
+
+/* ---------- 变身 & 光线 ---------- */
+function tryTransform(){
+  if (!started || dead) return;
+  if (player.giant){ unTransform(); return; }                    // 巨人状态再按 T 随时切回
+  if (player.energy < ENERGY_MAX){ flashMsg('能量不足！击败怪兽充能'); return; }
+  player.giant = true;                                           // 满能量变身：无时长限制
+  player.energy = 0;
+  if (gunMode) toggleGun();                                      // 收掉机枪模式（巨人不打枪，避免HUD残留/按住左键变身还在连发）
+  firing = false;
+  player.maxHp = 100;                                            // 巨人血量100
+  player.hp = 100;                                               // 变身即满血
+  scene.remove(player.group);
+  player.group = player.modelG.group; scene.add(player.group);
+  poof(player.headPos(), 0x36c6ff, 30);
+  poof(player.pos.clone().add(new THREE.Vector3(0,2.5,0)), 0xffffff, 18);   // 白色爆闪
+  SFX.transform();
+  startTransformFx();                                             // 耀眼光柱 + 环绕光球 + 闪屏
+  flashMsg('💪 按住 空格 起飞 · W 前飞 · C 降落（头顶被岛挡住时按住 W 滑出去）');
+  document.getElementById('transTimer').style.display='block';
+  document.getElementById('transTimer').textContent = '💪 巨人形态 · 无限时长（T 变回）';
+  updateHUD();
+}
+function unTransform(){
+  player.giant = false; player.noGravity = false; player.huge = false;
+  kickT = 0; lockPoint = null; lockMark.visible = false; beamLoopStop(); vHoldT = -1;
+  stopTransformFx();
+  player.maxHp = 20;                                             // 变回人类：血量回到20上限
+  player.hp = Math.min(player.hp, 20);
+  scene.remove(player.group);
+  player.group = player.modelN.group; scene.add(player.group);
+  // 巨人变回时可能卡在方块里/悬在空中，抬到地表
+  player.pos.y = Math.max(player.pos.y, onSurfaceY(player.pos.x, player.pos.z, player.pos.y+2)+.2);
+  SFX.revert();
+  document.getElementById('transTimer').style.display='none';
+  updateHUD();
+}
+/* ---------- 变身特效：耀眼白光闪屏 + 冲天蓝色光柱 + 环绕闪耀光球（越转越快随变身淡出） ---------- */
+const transFx = { orbs: [], t: 0, pillar: null, light: null };
+const transFlashEl = document.createElement('div');
+transFlashEl.style.cssText = 'position:fixed;inset:0;background:radial-gradient(circle,#ffffff 0%,#aee6ff 45%,rgba(120,200,255,0) 78%);opacity:0;pointer-events:none;z-index:30';
+document.body.appendChild(transFlashEl);
+function startTransformFx(){
+  transFx.t = 2.8;
+  for (let i=0;i<6;i++){                                         // 六颗蓝色闪耀光球环绕周身
+    const m = new THREE.Mesh(new THREE.SphereGeometry(.42, 12, 10),
+      new THREE.MeshBasicMaterial({color:0x9fe8ff, transparent:true, opacity:.95, blending:THREE.AdditiveBlending, depthWrite:false}));
+    scene.add(m);
+    transFx.orbs.push({mesh:m, ph: i/6*Math.PI*2, r: 3.1 + (i%2)*.9, h: 1 + (i%3)*1.7, spd: 2.2 + (i%3)*.8});
+  }
+  transFx.pillar = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 2.6, 34, 14, 1, true),
+    new THREE.MeshBasicMaterial({color:0x66e8ff, transparent:true, opacity:.55, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide}));
+  scene.add(transFx.pillar);
+  transFx.lightItem = borrowLight(0x9fe8ff, 5, 44, player.pos, 99);
+  transFx.light = transFx.lightItem.L;
+  transFlashEl.style.transition = 'none'; transFlashEl.style.opacity = '1';   // 耀眼白光闪屏→淡出
+  requestAnimationFrame(()=>{ transFlashEl.style.transition = 'opacity 1.2s ease-out'; transFlashEl.style.opacity = '0'; });
+}
+function stopTransformFx(){
+  if (transFx.pillar){ scene.remove(transFx.pillar); transFx.pillar.geometry.dispose(); transFx.pillar.material.dispose(); transFx.pillar = null; }
+  if (transFx.lightItem){ releaseLight(transFx.lightItem); transFx.lightItem = null; transFx.light = null; }
+  for (const o of transFx.orbs){ scene.remove(o.mesh); o.mesh.geometry.dispose(); o.mesh.material.dispose(); }
+  transFx.orbs.length = 0;
+  transFx.t = 0;
+  transFlashEl.style.opacity = '0';
+}
+/* 巨人光线视觉：白芯 + 青晕双层圆柱，几何高度 1、用 scale.y 拉到射程长 */
+function makeBeamLayer(rTop, rBot, color, opacity){
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, 1, 12, 1, true),
+    new THREE.MeshBasicMaterial({color, transparent:true, opacity, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide}));
+  m.visible = false; scene.add(m); return m;
+}
+const beamCore = makeBeamLayer(.20, .28, 0xffffff, .95);
+const beamGlow = makeBeamLayer(.55, .85, 0x36c6ff, .45);
+const BEAM_LEN = 34;
+let beamT = 0, beamThick = 1, beamLight = new THREE.PointLight(0x66e8ff, 0, 60); scene.add(beamLight);
+function fireBeam(side){
+  if (!player.giant || dead || !started) return;
+  lastBeamHand = side || 'both';
+  const charged = lastBeamHand==='both';
+  const origin = player.headPos(), dir = camDir();
+  beamT = .55;
+  /* 蓝色=单手速射（右手/左手交替）/ 红色=蓄力双手（更粗、伤害更高） */
+  beamCore.material.color.setHex(charged ? 0xffdcdc : 0xeaf9ff);
+  beamGlow.material.color.setHex(charged ? 0xff2b2b : 0x36c6ff);
+  beamLight.color.setHex(charged ? 0xff4040 : 0x66e8ff);
+  beamThick = charged ? 1.9 : 1;
+  const right = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
+  let start;
+  if (lastBeamHand==='right') start = origin.clone().addScaledVector(right, 1.4).addScaledVector(dir, 1.1).add(new THREE.Vector3(0,-2.0,0));
+  else if (lastBeamHand==='left') start = origin.clone().addScaledVector(right, -1.4).addScaledVector(dir, 1.1).add(new THREE.Vector3(0,-2.0,0));
+  else start = origin.clone().addScaledVector(dir, 1.2);    // 双手：与准星同轴
+  for (const [m, len] of [[beamCore, BEAM_LEN], [beamGlow, BEAM_LEN]]){
+    m.visible = true;
+    m.position.copy(start).addScaledVector(dir, len/2);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir);
+    m.scale.set(beamThick, len, beamThick);
+  }
+  beamLight.position.copy(start); beamLight.intensity = 4;
+  poof(start, 0xffffff, 6);
+  SFX.beam();
+  /* 光线破坏地形：沿射线轰出一条十字截面隧道（保留最底层防止漏底）+ 湮灭 */
+  let broke = 0, bx0=1e9, bx1=-1e9, bz0=1e9, bz1=-1e9;
+  const anniSpots = [];
+  const anniC = charged ? 0xff5050 : 0x66e8ff;
+  for (let t=1.4; t<BEAM_LEN; t+=.5){
+    const px = Math.floor(origin.x + dir.x*t), py = Math.floor(origin.y + dir.y*t), pz = Math.floor(origin.z + dir.z*t);
+    for (const [ox,oy,oz] of [[0,0,0],[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]]){
+      const bx=px+ox, by=py+oy, bz=pz+oz;
+      if (by>=1 && SOLID.has(getB(bx,by,bz))){
+        setB(bx,by,bz,BLOCK.AIR); broke++;
+        if (bx<bx0)bx0=bx; if (bx>bx1)bx1=bx; if (bz<bz0)bz0=bz; if (bz>bz1)bz1=bz;
+        if (broke%9===0) anniSpots.push(new THREE.Vector3(bx+.5,by+.5,bz+.5));
+      }
+    }
+  }
+  if (broke){
+    dirtyArea(bx0-1, bx1+1, bz0-1, bz1+1); markDirty(); sfxNoise(.4, .22, 500);
+    for (const sp of anniSpots) annihilate(sp, anniC);
+  }
+  // 伤害：射线周围锥形范围内怪兽 + 动物（红色双手激光伤害更高，命中即湮灭）
+  const beamDmg = charged ? 14 : 8;
+  for (let i=monsters.length-1;i>=0;i--){
+    const m = monsters[i];
+    const mc = _v1.set(m.pos.x, m.pos.y+m.h*.5, m.pos.z);        // 复用临时向量
+    const to = _v2.copy(mc).sub(origin);
+    const dist = to.length(); to.normalize();
+    if (dist < BEAM_LEN+4 && to.dot(dir) > .90) {
+      annihilate(mc, anniC);
+      if (m.boss || m.mega) m.provoked = true;
+      m.hp -= beamDmg; m.hurtT=.25; if (m.hp<=0) killMonster(m,i);
+    }
+  }
+  for (let i=fauna.length-1;i>=0;i--){
+    const f = fauna[i];
+    const to = f.pos.clone().add(new THREE.Vector3(0,f.h*.5,0)).sub(origin);
+    const dist = to.length(); to.normalize();
+    if (dist < BEAM_LEN+4 && to.dot(dir) > .90) killFauna(f, i);
+  }
+}
+/* ---------- 黄色能量炮弹（点按F单手发射，左右交替）：飞行投射物，命中爆炸冲击波+湮灭 ---------- */
+const energyBalls = [];
+function fireEnergyBall(side){
+  if (!player.giant || dead || !started) return;
+  lastBeamHand = side;
+  beamT = .3;                                                  // 短暂举手姿势
+  const origin = player.headPos(), dir = camDir();
+  const right = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
+  const start = origin.clone().addScaledVector(right, side==='right'?1.4:-1.4)
+    .addScaledVector(dir, 1.1).add(new THREE.Vector3(0,-2.0,0));
+  const core = new THREE.Mesh(new THREE.SphereGeometry(.5, 12, 10),
+    new THREE.MeshBasicMaterial({color:0xffe9a0}));
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(.85, 12, 10),
+    new THREE.MeshBasicMaterial({color:0xffd75e, transparent:true, opacity:.45, blending:THREE.AdditiveBlending, depthWrite:false}));
+  core.add(glow);
+  const pl = borrowLight(0xffd75e, 2.4, 18, start, 99);          // 随身光珠：从灯光池借（照亮沿途地形）
+  core.position.copy(start);
+  scene.add(core);
+  energyBalls.push({mesh:core, glow, pl, ph:Math.random()*6, vel:dir.clone().multiplyScalar(28), t:1.6});
+  poof(start, 0xffd75e, 4);
+  burst(start, 0xffd75e, 3, 5);
+  SFX.blast();
+}
+function energyBallExplode(pos){
+  annihilate(pos, 0xffd75e);                                   // 湮灭环+内爆音
+  poof(pos, 0xffd75e, 10); poof(pos, 0xffffff, 4);
+  burst(pos, 0xffd75e, 12, 8); burst(pos, 0xffffff, 5, 6);     // 金色碎片飞溅
+  shake(.34 * Math.max(.25, 1 - pos.distanceTo(player.pos)/40));  // 越近震得越狠
+  sfxNoise(.25, .2, 700);
+  /* 冲击波：半径4.5范围伤害+击退（爆炸点在命中怪身前，半径要盖住侧后方） */
+  for (let i=monsters.length-1;i>=0;i--){
+    const m = monsters[i];
+    const mc = _v2.set(m.pos.x, m.pos.y+m.h*.5, m.pos.z);
+    if (mc.distanceTo(pos) < 4.5 + m.hw){
+      if (m.boss || m.mega) m.provoked = true;
+      m.hp -= 8; m.hurtT = .25; m.knockT = .3;
+      const kb = m.pos.clone().sub(pos); kb.y = 0;
+      if (kb.lengthSq() > .01) kb.normalize(); else kb.set(0,0,1);
+      m.vel.addScaledVector(kb, 8).y = 5;
+      if (m.hp <= 0) killMonster(m, i);
+    }
+  }
+  for (let i=fauna.length-1;i>=0;i--){
+    const f = fauna[i];
+    if (f.pos.clone().add(new THREE.Vector3(0,f.h*.5,0)).distanceTo(pos) < 1.4) killFauna(f, i);
+  }
+  /* 命中地形：轰小坑（保留最底层防漏底） */
+  const ip = pos.clone().floor();
+  let broke = 0, bx0=1e9, bx1=-1e9, bz0=1e9, bz1=-1e9;
+  for (const [ox,oy,oz] of [[0,0,0],[1,0,0],[-1,0,0],[0,1,0],[0,0,1],[0,0,-1]]){
+    const bx=ip.x+ox, by=ip.y+oy, bz=ip.z+oz;
+    if (by>=1 && SOLID.has(getB(bx,by,bz))){
+      setB(bx,by,bz,BLOCK.AIR); broke++;
+      if (bx<bx0)bx0=bx; if (bx>bx1)bx1=bx; if (bz<bz0)bz0=bz; if (bz>bz1)bz1=bz;
+    }
+  }
+  if (broke){ dirtyArea(bx0-1, bx1+1, bz0-1, bz1+1); markDirty(); }
+}
+function updateEnergyBalls(dt){
+  for (let i=energyBalls.length-1;i>=0;i--){
+    const b = energyBalls[i];
+    b.t -= dt;
+    b.mesh.position.addScaledVector(b.vel, dt);
+    b.pl.L.position.copy(b.mesh.position);                       // 光珠跟随炮弹
+    b.ph += dt*14;
+    b.glow.scale.setScalar(1 + Math.sin(b.ph)*.3);               // 光壳呼吸脉冲
+    if (Math.random()<.7) poof(b.mesh.position, 0xffd75e, 1);  // 金色尾焰
+    const pnt = b.mesh.position;
+    let boom = b.t<=0 || pnt.y<1;
+    if (!boom && SOLID.has(getB(Math.floor(pnt.x), Math.floor(pnt.y), Math.floor(pnt.z)))) boom = true;   // 撞地形
+    if (!boom){
+      for (const m of monsters){
+        if (m.pos.clone().add(new THREE.Vector3(0,m.h*.5,0)).distanceTo(pnt) < m.hw + .9){ boom = true; break; }
+      }
+    }
+    if (boom){
+      energyBallExplode(pnt.clone());
+      scene.remove(b.mesh);
+      releaseLight(b.pl);                                        // 光珠归还灯光池
+      for (const part of [b.mesh, b.glow]){ part.geometry.dispose(); part.material.dispose(); }
+      energyBalls.splice(i,1);
+    }
+  }
+}
+/* ---------- 巨人飞踢：锁定技——左键锁定区域后按V，双脚朝目标直冲，撞上怪兽/物体才停 ----------
+   点按V=快速踢（45伤+小范围爆炸，冷却1.2s可连用）；按住V蓄力1.5s=蓄力飞踢（穿透怪不停，终点60伤大爆炸） ---------- */
+function tryKick(charged){
+  if (!player.giant || dead || !started) return;
+  if (!charged && kickCd > 0) return;                            // 蓄力版本身有1.5s代价，不受冷却限制
+  kickCharged = !!charged;
+  kickSpd = kickCharged ? 40 : 34;
+  kickT = 2.4; kickCd = kickCharged ? 2.2 : 1.2;                 // 时间预算 2.4s；冷却大减=可连续使用
+  const from = player.pos.clone().add(new THREE.Vector3(0, 2.5, 0));
+  if (lockPoint) kickDir.copy(lockPoint).sub(from);               // 冲向锁定点
+  else kickDir.copy(camDir());                                    // 未锁定：沿准星直冲
+  if (kickDir.lengthSq() < .01) kickDir.copy(camDir());           // 锁点恰好在躯干上：防零向量 NaN
+  kickDir.normalize();
+  kickHit = new Set(); kickRingT = 0;
+  lastKickPos.copy(player.pos);
+  player.yaw = Math.atan2(-kickDir.x, -kickDir.z);                // 起脚瞬间面朝目标（双脚对准）
+  player.pitch = Math.asin(THREE.MathUtils.clamp(kickDir.y, -1, 1));
+  SFX.kick();
+  flashEl.textContent = kickCharged ? '💥 蓄力巨人飞踢！！' : '🦵 巨人飞踢！';
+  flashT = .8;
+}
+/* ---------- 巨大化（B）：巨人形态体型再膨胀3.2倍——头顶16格，比超级巨兽还高一截 ---------- */
+function toggleHuge(){
+  if (!started || dead || !player.giant || kickT > 0) return;
+  player.huge = !player.huge;
+  const c = player.pos.clone().add(new THREE.Vector3(0, 3, 0));
+  if (player.huge){
+    poof(c, 0xd7dbe4, 26); poof(player.headPos(), 0xffffff, 12);
+    burst(c, 0xd7dbe4, 14, 9);
+    annihilate(c, 0xd7dbe4, true);
+    shake(.45); SFX.giant();
+    flashMsg('🔴 巨大化！！体型超越超级巨兽（再按 B 解除）');
+  } else {
+    poof(c, 0xffffff, 14); SFX.revert();
+    flashMsg('身体缩回巨人尺寸');
+  }
+  transTimerEl.textContent = player.huge ? '🔴 巨大化中 · 无限时长（B 解除 / T 变回）' : '💪 巨人形态 · 无限时长（T 变回）';
+}
+/* ---------- 巨人拳击（R）：格斗式三连段——刺拳/勾拳/双臂上勾重拳，第三拳把怪打飞 ---------- */
+let punchT = 0, punchCombo = 0, punchCd = 0, punchArmR = true, lastPunchAt = 0, hitstopT = 0;
+function tryPunch(){
+  if (!player.giant || dead || !started || punchCd > 0 || kickT > 0) return;
+  const nowMs = performance.now();
+  punchCombo = (nowMs - lastPunchAt < 950) ? (punchCombo % 3) + 1 : 1;   // 0.95s 内连按出连段，停手重置
+  lastPunchAt = nowMs;
+  punchArmR = punchCombo !== 2;
+  punchT = .3; punchCd = .36;
+  SFX.punch(punchCombo === 3);
+  const k = player.huge ? 3.2 : 1;
+  const origin = player.headPos(), dir = camDir();
+  const reach = 5.5*k + 1.5;
+  let best = null, bestD = 1e9, bestI = -1;
+  for (let i=0;i<monsters.length;i++){
+    const m = monsters[i];
+    const to = m.pos.clone().add(new THREE.Vector3(0, Math.min(m.h, 4*k)*.5, 0)).sub(origin);
+    const dd = to.length();
+    if (dd < reach + m.hw && to.normalize().dot(dir) > .7 && dd < bestD){ best = m; bestD = dd; bestI = i; }
+  }
+  if (best){
+    const dmg = [0, 8, 10, 18][punchCombo] * (player.huge ? 1.6 : 1);
+    const hp = best.pos.clone().add(new THREE.Vector3(0, Math.min(best.h, 4.5*k)*.6, 0));
+    if (best.boss || best.mega) best.provoked = true;
+    best.hp -= dmg; best.hurtT = .3;
+    best.vel.addScaledVector(dir, punchCombo===3?15:9).y = punchCombo===3?8:3.5;
+    annihilate(hp, punchCombo===3 ? 0xffe08a : 0xffffff, true);
+    burst(hp, punchCombo===3 ? 0xffe08a : 0xffffff, punchCombo===3?10:5, 7);
+    if (punchCombo === 3){ shake(.42); hitstopT = .09; SFX.boom(); }      // 上勾重拳：顿帧+重爆
+    else shake(.16);
+    if (best.hp <= 0) killMonster(best, bestI);
+  }
+}
+/* 飞踢命中爆炸：范围伤害+击退+湮灭（蓄力版半径/伤害更大） */
+function kickBlast(center, charged){
+  const R = charged ? 8 : 5, dmg = charged ? 60 : 45;
+  annihilate(center, 0xffe08a);
+  annihilate(center, charged ? 0xff7b1f : 0x36c6ff);
+  poof(center, 0xffe08a, charged ? 20 : 10);
+  if (charged) poof(center, 0xff7b1f, 14);
+  burst(center, 0xffe08a, charged ? 18 : 11, 10);                // 碎片飞溅
+  if (charged) burst(center, 0xff7b1f, 12, 9);
+  shake(charged ? .62 : .4);                                     // 命中镜头冲击
+  if (charged) hitstopT = .1;                                    // 蓄力大爆：顿帧慢放
+  SFX.boom();
+  if (charged) SFX.anni();
+  for (let i=monsters.length-1;i>=0;i--){
+    const m = monsters[i];
+    const mc = _v1.set(m.pos.x, m.pos.y+m.h*.5, m.pos.z);
+    if (mc.distanceTo(center) < R + m.hw){
+      if (m.boss || m.mega) m.provoked = true;
+      m.hp -= dmg; m.hurtT = .35; m.knockT = .5;
+      const kb = m.pos.clone().sub(center); kb.y = 0;
+      if (kb.lengthSq() > .01) kb.normalize(); else kb.set(0,0,1);
+      m.vel.addScaledVector(kb, 16).y = 9;
+      if (m.hp <= 0) killMonster(m, i);
+    }
+  }
+}
+
+/* ---------- 敌方远程光束（Boss/超级巨兽）：伤害不高、频率低、蓄能时可走位躲 ---------- */
+const eBeamCore = makeBeamLayer(.14, .2, 0xff8a7e, .9);
+const eBeamGlow = makeBeamLayer(.42, .62, 0xb81f1f, .4);
+const EBEAM_LEN = 42;
+let eBeamT = 0, eBeamLight = new THREE.PointLight(0xff4b3b, 0, 50); scene.add(eBeamLight);
+/* ---------- 点光池：常驻6盏（闲置强度0）——动态增删点光会触发着色器重编译，是战斗卡帧的根源 ---------- */
+const lightPool = [];
+for (let i=0;i<6;i++){
+  const L = new THREE.PointLight(0xffffff, 0, 30); scene.add(L);
+  lightPool.push({L, t:0});
+}
+function borrowLight(color, intensity, dist, pos, life){
+  const it = lightPool.find(x=>x.t<=0) || lightPool[0];          // 没空闲就复用最旧的一盏
+  it.L.color.setHex(color); it.L.intensity = intensity; it.L.distance = dist;
+  it.L.position.copy(pos); it.t = life;
+  return it;
+}
+function releaseLight(it){ it.t = 0; it.L.intensity = 0; }
+function updateLightPool(dt){
+  for (const it of lightPool){
+    if (it.t > 0 && it.t < 90){ it.t -= dt; if (it.t <= 0) it.L.intensity = 0; }   // 限时灯到期自动熄灭
+  }
+}
+function enemyBeamFire(m){
+  const mouth = m.pos.clone().add(new THREE.Vector3(0, m.parts.mouthY*m.parts.scl, 0));
+  const aim = player.pos.clone().add(new THREE.Vector3(0, player.giant?(player.huge?8:2.4):.9, 0));
+  const dir = aim.sub(mouth).normalize();
+  dir.x += (Math.random()-.5)*.05; dir.y += (Math.random()-.5)*.05; dir.z += (Math.random()-.5)*.05;
+  dir.normalize();
+  const block = voxelRay(mouth, dir, EBEAM_LEN);               // 掩体挡光束
+  const len = block ? block.dist : EBEAM_LEN;
+  for (const [bm, L] of [[eBeamCore, len], [eBeamGlow, len]]){
+    bm.visible = true;
+    bm.position.copy(mouth).addScaledVector(dir, L/2);
+    bm.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir);
+    bm.scale.set(1, L, 1);
+  }
+  eBeamLight.position.copy(mouth).addScaledVector(dir, 2);
+  eBeamT = .32;
+  SFX.ebeam();
+  // 命中：射线到玩家中心最近距离
+  const center = player.pos.clone().add(new THREE.Vector3(0, player.giant?(player.huge?8:2.4):.9, 0));
+  const toC = center.clone().sub(mouth);
+  const along = toC.dot(dir);
+  if (along>0 && along<len){
+    const closest = mouth.clone().addScaledVector(dir, along);
+      if (closest.distanceTo(center) < (player.giant?(player.huge?4.5:1.6):.75) && kickT<=0){
+      const d = m.mega?6:3;
+      player.hp -= d; updateHUD(); damageFeedback(d); SFX.hurt();
+      if (player.hp<=0) die();
+    }
+  }
+}
+
+/* ---------- 巨兽王火球：飞行投射物，速度慢可走位闪避，命中爆炸 ---------- */
+const fireballs = [];
+function spitFireball(m){
+  const mouth = m.pos.clone().add(new THREE.Vector3(0, m.parts.mouthY*m.parts.scl, 0));
+  const aim = player.pos.clone().add(new THREE.Vector3(0, player.giant?(player.huge?8:2.4):.9, 0));
+  const dir = aim.sub(mouth).normalize();
+  dir.x += (Math.random()-.5)*.06; dir.y += (Math.random()-.5)*.04; dir.z += (Math.random()-.5)*.06;
+  dir.normalize();
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(.5, 10, 8),
+    new THREE.MeshBasicMaterial({color:0xff7b1f}));
+  mesh.position.copy(mouth);
+  scene.add(mesh);
+  fireballs.push({mesh, vel:dir.multiplyScalar(13), t:4.5});
+  SFX.ebeam();
+}
+function updateFireballs(dt){
+  for (let i=fireballs.length-1;i>=0;i--){
+    const f = fireballs[i];
+    f.t -= dt;
+    f.mesh.position.addScaledVector(f.vel, dt);
+    if (Math.random()<.6) poof(f.mesh.position, Math.random()<.5?0xff7b1f:0xffd75e, 1);
+    const pnt = f.mesh.position;
+    let boom = f.t<=0 || pnt.y<1;
+    if (!boom){
+      const hb = getB(Math.floor(pnt.x), Math.floor(pnt.y), Math.floor(pnt.z));
+      if (SOLID.has(hb)) boom = true;                          // 撞地形
+    }
+    if (!boom){
+      const center = player.pos.clone().add(new THREE.Vector3(0, player.giant?(player.huge?8:2.4):.9, 0));
+      if (pnt.distanceTo(center) < (player.giant?2.0:1.0)){
+        if (kickT<=0){
+          player.hp -= 6; updateHUD(); damageFeedback(6); SFX.hurt();
+          if (player.hp<=0) die();
+        }
+        boom = true;
+      }
+    }
+    if (boom){
+      annihilate(pnt, 0xff7b1f);
+      poof(pnt, 0xff7b1f, 12);
+      burst(pnt, 0xff7b1f, 10, 8);                             // 火球碎片
+      shake(.3 * Math.max(.25, 1 - pnt.distanceTo(player.pos)/40));
+      sfxNoise(.3,.2,600);
+      scene.remove(f.mesh); f.mesh.geometry.dispose(); f.mesh.material.dispose();
+      fireballs.splice(i,1);
+    }
+  }
+}
+
+/* 提示条 */
+let flashT=0; const flashEl = document.createElement('div');
+flashEl.style.cssText='position:fixed;left:50%;top:26%;transform:translateX(-50%);color:#ffd75e;font-size:18px;text-shadow:0 1px 4px #000;z-index:11;pointer-events:none';
+document.body.appendChild(flashEl);
+function flashMsg(s){ flashEl.textContent = s; flashT = 1.6; }
+
+/* ---------- 左右键行为 ---------- */
+// 打怪命中检测用 three.js 射线（仅点击时跑一次，怪兽就几只）；方块检测走上面的 DDA
+// camera 必须挂上：怪兽头顶血条是 Sprite，射线碰到 Sprite 时 three 要用 raycaster.camera，
+// 不挂会抛 TypeError（2026-09-29 实测：加血条后机枪/拳头全部打不出伤害的根因）
+const ray = new THREE.Raycaster();
+ray.camera = camera;
+function leftAction(){
+  SFX.punch();                                                 // 挥拳破空声（命中音由血量钩子补上）
+  // 先看怪兽和动物（打）
+  ray.set(player.headPos(), camDir()); ray.far = player.giant?7:3.6;
+  const boxes = [...monsters.map(m=>m.parts.group), ...fauna.map(f=>f.parts.group)];
+  const hits = ray.intersectObjects(boxes, true);
+  if (hits.length){
+    let o = hits[0].object; while (o.parent && !boxes.includes(o)) o = o.parent;
+    const bi = boxes.indexOf(o);
+      if (bi>=0){
+      if (bi < monsters.length){
+        const best = monsters[bi];
+        if (best.boss || best.mega) best.provoked = true;
+        best.hp -= player.giant?10:1; best.hurtT=.25; SFX.hit();
+        best.vel.add(camDir().clone().multiplyScalar(player.giant?14:5)).y += 3;
+        if (best.hp<=0) killMonster(best, bi);
+      } else {
+        SFX.hit();
+        killFauna(fauna[bi-monsters.length], bi-monsters.length);
+      }
+      return;
+    }
+  }
+  // 否则挖方块
+  const hit = blockHitFrom(player.headPos(), camDir(), player.giant?7:4.6);
+  if (hit){
+    const t = getB(hit.x,hit.y,hit.z);
+    setB(hit.x,hit.y,hit.z,BLOCK.AIR);
+    playerPlaced.delete(idx(hit.x,hit.y,hit.z));               // 自己拆掉的不复活（黎明不再修复此格）
+    if (!PLANTS.has(t)) player.inv[t] = (player.inv[t]||0)+1;   // 花草打掉不给方块
+    poof(new THREE.Vector3(hit.x+.5,hit.y+.5,hit.z+.5), 0xffffff, 8);
+    SFX.breakB();
+    dirtyBlock(hit.x,hit.y,hit.z); refreshHotbar(); markDirty();
+  }
+}
+function rightAction(){
+  const hit = blockHitFrom(player.headPos(), camDir(), player.giant?7:4.6);
+  if (!hit) return;
+  const t = PLACEABLE[player.slot];
+  if (!(player.inv[t]>0)) { flashMsg('这种方块没有了，去采集吧'); return; }
+  let px, py, pz;
+  if (PLANTS.has(getB(hit.x,hit.y,hit.z))){ px=hit.x; py=hit.y; pz=hit.z; }   // 对着花草放=直接替换
+  else { px = hit.x + hit.nx; py = hit.y + hit.ny; pz = hit.z + hit.nz; }     // 放在命中面相邻空气格（DDA 法线）
+  if (getB(px,py,pz)!==BLOCK.AIR && !PLANTS.has(getB(px,py,pz))) return;
+  // 不能放在自己身上
+  const dm = player.dims();
+  if (px+1>player.pos.x-dm.hw && px<player.pos.x+dm.hw &&
+      pz+1>player.pos.z-dm.hw && pz<player.pos.z+dm.hw &&
+      py+1>player.pos.y && py<player.pos.y+dm.h) return;
+  setB(px,py,pz,t);
+  playerPlaced.set(idx(px,py,pz), t);                          // 亲手放的方块登记在案：每次黎明修复成原样（日夜都保护）
+  player.inv[t]--; SFX.place(); dirtyBlock(px,py,pz); refreshHotbar(); markDirty();
+}
+
+/* ---------- HUD ---------- */
+const heartsEl = document.getElementById('hearts');
+const energyBar = document.getElementById('energyBar');
+const energyTxt = document.getElementById('energyTxt');
+const clockEl = document.getElementById('clock');
+const hotbarEl = document.getElementById('hotbar');
+const transTimerEl = document.getElementById('transTimer');
+const sanctTipEl = document.getElementById('sanctTip');
+const bdEl = document.getElementById('bossDir');
+const bossArrowEl = document.getElementById('bossArrow');
+const bossTxtEl = document.getElementById('bossTxt');
+const chargeBarEl = document.getElementById('chargeBar');
+const chargeFillEl = document.getElementById('chargeFill');
+const slotCvs = [];
+function buildHotbar(){
+  hotbarEl.innerHTML='';
+  PLACEABLE.forEach((t,i)=>{
+    const d = document.createElement('div'); d.className='slot'+(i===player.slot?' sel':'');
+    const c = TEXS[t].cv.cloneNode(); c.getContext('2d').drawImage(TEXS[t].cv,0,0);
+    d.appendChild(c);
+    const k = document.createElement('div'); k.className='key'; k.textContent=i+1; d.appendChild(k);
+    const cnt = document.createElement('div'); cnt.className='cnt'; d.appendChild(cnt);
+    hotbarEl.appendChild(d); slotCvs.push(cnt);
+  });
+}
+function refreshHotbar(){
+  [...hotbarEl.children].forEach((d,i)=> d.classList.toggle('sel', i===player.slot));
+  PLACEABLE.forEach((t,i)=> slotCvs[i].textContent = player.inv[t]||0);
+}
+function updateHUD(){
+  const seg = player.maxHp/10;                                   // 每颗心代表的生命值（巨人100=每心10）
+  let h=''; for (let i=0;i<10;i++) h += (player.hp >= (i+1)*seg) ? '❤' : (player.hp >= i*seg+seg/2 ? '💗' : '🖤');
+  heartsEl.textContent = h;
+  document.getElementById('hpNum').textContent = Math.max(0,player.hp)+'/'+player.maxHp;
+  document.getElementById('stats').classList.toggle('low', player.hp<=6 && player.hp>0);
+  energyBar.style.width = (player.energy/ENERGY_MAX*100)+'%';
+  energyTxt.textContent = player.giant ? '巨人形态' : `能量 ${player.energy}/${ENERGY_MAX}（击败怪兽充能，满了按 T 变身）`;
+}
+/* 受击反馈：屏幕红光 + 血条抖动 + 飘字 */
+function damageFeedback(dmg){
+  const f = document.getElementById('dmgFlash');
+  f.style.transition='none'; f.style.opacity='.9';
+  requestAnimationFrame(()=>{ requestAnimationFrame(()=>{ f.style.transition='opacity .5s'; f.style.opacity='0'; }); });
+  const n = document.getElementById('dmgNum');
+  n.textContent = '−'+dmg+'  HP '+Math.max(0,player.hp)+'/'+player.maxHp;
+  n.style.transition='none'; n.style.opacity='1'; n.style.top='34%';
+  requestAnimationFrame(()=>{ requestAnimationFrame(()=>{ n.style.transition='top 1s ease-out, opacity 1s'; n.style.top='40%'; n.style.opacity='0'; }); });
+  const st = document.getElementById('stats');
+  st.style.transform='scale(1.15)';
+  setTimeout(()=>{ st.style.transform=''; }, 160);
+}
+let day = 1, dayT = 0;  // dayT: 0..DAY_LEN，前半白天
+let nightKills = 0, bossAggroAnnounced = false;                // 警戒系统：当夜击杀小怪数
+const BOSS_AGGRO_KILLS = 6;                                    // 警戒满(杀满6只小怪)Boss才参战
+function isNight(){ return dayT > DAY_LEN/2; }
+
+/* ---------- 夜晚战损复原：入夜拍下世界快照，黎明把昨夜破坏/改动的大地一键还原 ---------- */
+let cleanSnap = null, lastNight = false, dawnHealed = 0;       // cleanSnap：每日黎明拍的洁净基准（下次黎明把全部战损复原）
+const playerPlaced = new Map();                                // 玩家亲手放的方块 idx→类型（每次黎明修复成原样，日夜都保护；0=玩家自己拆的）
+function unstickEnt(pos, h){                                  // 复原填回的方块可能把生物埋在里面 → 抬回地表
+  const bx = Math.floor(pos.x), bz = Math.floor(pos.z);
+  for (let y=Math.floor(pos.y); y<=Math.floor(pos.y)+1; y++)   // 只查脚部两格：头顶碰到山体不算被埋（巨大化身高16格，查全身会误传山顶）
+    if (SOLID.has(getB(bx,y,bz))){ pos.y = onSurfaceY(pos.x, pos.z, Math.floor(pos.y)+2); return; }
+}
+function dawnRestore(){                                       // 黎明：把这一昼夜所有战损复原（日夜打坏都修），玩家盖的建筑保留
+  if (!cleanSnap) return;
+  const snap = cleanSnap; cleanSnap = null;
+  let n = 0, minX = WORLD, maxX = 0, minZ = WORLD, maxZ = 0;
+  const spark = [];                                            // 采样部分复原点，拂晓时放治愈光尘
+  for (const [i, t] of playerPlaced){                          // 玩家亲手放的方块=玩家版本定稿：被怪打坏按原样复原，自己拆的(delete)不复活
+    if (vox[i] === t) continue;
+    vox[i] = t; n++;
+    const x = i % WORLD, rz = (i - x) / WORLD, z = rz % WORLD;
+    if (x<minX) minX=x; if (x>maxX) maxX=x;
+    if (z<minZ) minZ=z; if (z>maxZ) maxZ=z;
+    if (t && (i % WORLD) > WATER && spark.length<60) spark.push(x+.5, Math.floor(rz/WORLD)+.5, z+.5);
+  }
+  for (let y=0; y<HEIGHT; y++)
+    for (let z=0; z<WORLD; z++){
+      let i = idx(0,y,z);
+      for (let x=0; x<WORLD; x++,i++){
+        const s = snap[i];
+        if (s === vox[i]) continue;
+        if (playerPlaced.has(i)) continue;                     // 玩家版本定稿，不被快照抹掉
+        vox[i] = s; n++;                                       // 其余一切战损（含白天打的）照快照回写
+        if (x<minX) minX=x; if (x>maxX) maxX=x;
+        if (z<minZ) minZ=z; if (z>maxZ) maxZ=z;
+        if (s && y>WATER && spark.length<180 && ((x*7+z*13+y*3)&31)===0) spark.push(x+.5,y+.5,z+.5);
+      }
+    }
+  for (const f of fauna) if (f.orbit){ f.pos.y = onSurfaceY(f.pos.x, f.pos.z, f.pos.y+2) + .05; }
+  dawnHealed = n;
+  if (!n) { cleanSnap = vox.slice(); return; }                 // 无战损也要刷新洁净基准（含玩家改动后的世界）
+  dirtyArea(minX-1, maxX+1, minZ-1, maxZ+1); markDirty();
+  for (let k=0;k<spark.length;k+=3) poof(new THREE.Vector3(spark[k],spark[k+1],spark[k+2]), '#fff7d6', 2);
+  unstickEnt(player.pos, player.giant?4.8:2.1);
+  for (const f of fauna) if (!f.orbit) unstickEnt(f.pos, 1.2);
+  sfxNoise(.6, .14, 900);
+  flashMsg(`🌅 晨光拂过，战损的大地全部复原了（${n} 格）`);
+  cleanSnap = vox.slice();                                     // 新一天的洁净基准：以修复后的世界为底
+}
+function updateClock(){
+  const phase = isNight()?'🌙 夜晚':'☀️ 白天';
+  clockEl.innerHTML = `第 ${day} 天 · ${phase}<br>击败 ${player.kills} 只<br>警戒 ${Math.min(nightKills,BOSS_AGGRO_KILLS)}/${BOSS_AGGRO_KILLS}`;
+}
+
+/* ---------- 保存 ---------- */
+let dirty=false, saveTimer=0;
+function markDirty(){ dirty=true; }
+function rleEncode(a){                                        // 游程编码：空气/深岩长行程一压到底
+  const out = []; let v = a[0], c = 1;
+  for (let i=1;i<a.length;i++){
+    if (a[i]===v && c<65535) c++;
+    else { out.push(v,c); v=a[i]; c=1; }
+  }
+  out.push(v,c); return out;
+}
+function rleDecode(r, len){
+  const a = new Uint8Array(len); let i = 0;
+  for (let k=0;k<r.length;k+=2){ a.fill(r[k], i, i+r[k+1]); i += r[k+1]; }
+  return i===len ? a : null;
+}
+function save(){
+  const data = {r:rleEncode(vox), p:[player.pos.x,player.pos.y,player.pos.z], day, kills:player.kills, inv:player.inv, hp:player.hp, energy:player.energy};
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(data)); }catch(e){}
+  dirty=false;
+}
+function load(){
+  try{
+    const s = localStorage.getItem(SAVE_KEY);
+    if (!s) return false;
+    const d = JSON.parse(s);
+    if (!d.r) return false;
+    const a = rleDecode(d.r, vox.length);
+    if (!a) return false;
+    vox.set(a); player.pos.set(d.p[0],d.p[1],d.p[2]); day=d.day; player.kills=d.kills||0;
+    player.hp = Math.min(d.hp||20, 20);                          // 读档必为人类形态，血量按20上限收敛
+    player.maxHp = 20; player.energy = d.energy||0;
+    Object.assign(player.inv, d.inv||{});
+    rebuildAll(); return true;
+  }catch(e){ return false; }
+}
+localStorage.removeItem('lightgiant_save_v1');                 // 旧版存档已不兼容，清掉
+localStorage.removeItem('lightgiant_save_v2');
+const loaded = load();
+/* 旧存档一次性地标升级：木屋时代的世界补建宫殿（新世界生成时已自带） */
+if (loaded && !localStorage.getItem('lg_landmarks_v2')){
+  const used = [];
+  for (let n=0;n<3;n++){
+    const s = flatSpot(7, 500+n, 90, used);
+    if (s) buildGrandPalace(s.x, s.z, s.h);
+  }
+  localStorage.setItem('lg_landmarks_v2', '1');
+  markDirty(); rebuildAll();
+}
+buildHeavenFalls();                                              // 瀑布/彩虹/水雾是装饰网格，每次启动按当前地形重建
+{ // 圣域/夜灯登记：按确定性盐值重算宫殿点位，只登记世界里真实存在的宫殿（新世界、旧存档升级、已升级存档通吃）
+  for (const salt0 of [200, 500]){
+    const used = [];
+    for (let n=0; n<3; n++){
+      const s = flatSpot(7, salt0+n, 90, used); if (!s) break;
+      const ghOk = getB(s.x, s.h, s.z)===BLOCK.LITE && getB(s.x-8, s.h, s.z)===BLOCK.STONE && getB(s.x+8, s.h, s.z)===BLOCK.STONE;
+      const hy = heavenSurfaceY(s.x, s.z);                                              // 天界圣殿也算数（地面殿可自愈重建）
+      const hOk = hy!==null && getB(s.x, hy, s.z)===BLOCK.CSTONE && getB(s.x+6, hy, s.z)===BLOCK.CSTONE;
+      if (ghOk || hOk) registerPalaceAmbience(s.x, s.z, s.h);
+    }
+  }
+}
+buildTeleporters();                                              // 天地传送阵：补建阵体（体素）+ 重建贯穿光束（每次启动）
+if (!cleanSnap) cleanSnap = vox.slice();                         // 启动基准：必须在传送阵/天界圣殿补建【之后】拍——否则黎明复原会把它们当战损误删（曾致天界圣殿黎明消失）
+addEventListener('beforeunload', ()=>{ if (dirty) save(); });  // 只有改动过才存，否则会把"重开新世界"刚删的存档又写回去
+setInterval(()=>{ if (dirty && started) save(); }, 20000);
+
+/* ---------- 死亡 ---------- */
+let dead = false;
+function die(){
+  dead = true; document.exitPointerLock();
+  beamLoopStop(); kickT = 0; lockPoint = null; lockMark.visible = false; vHoldT = -1; player.huge = false;
+  sanctTipEl.style.display = 'none';
+  document.getElementById('deathStats').innerHTML = `存活到 第 ${day} 天 · 共击败 ${player.kills} 只怪兽`;
+  document.getElementById('death').style.display='flex';
+  localStorage.removeItem(SAVE_KEY);
+}
+
+/* ---------- 主循环 ---------- */
+let spawnCd = 2, last = performance.now(), lastGroundY = 0;
+document.getElementById('btnStart').addEventListener('click', ()=>{
+  ac();                                                    // 用户手势里解锁音频
+  document.getElementById('start').style.display='none';
+  started = true;
+  canvas.requestPointerLock();
+});
+if (localStorage.getItem(SAVE_KEY)){
+  const b = document.getElementById('btnReset');
+  b.style.display = 'inline-block';
+  b.addEventListener('click', ()=>{ dirty=false; localStorage.removeItem(SAVE_KEY); location.reload(); });
+}
+buildHotbar(); refreshHotbar(); updateHUD(); updateClock();
+
+function frame(now){
+  requestAnimationFrame(frame);
+  let dt = Math.min(.05, (now-last)/1000); last = now;
+  if (hitstopT > 0){ hitstopT -= dt; dt *= .12; }              // 顿帧：重击命中瞬间世界慢放（格斗游戏手感）
+
+  if (started && !paused && !dead){
+    /* 玩家移动 */
+    const speed = (keys.ShiftLeft?8.2:5.2) * (player.giant?1.7:1);
+    const f = new THREE.Vector3(-Math.sin(player.yaw),0,-Math.cos(player.yaw));
+    const r = new THREE.Vector3(f.z,0,-f.x);
+    const mv = new THREE.Vector3();
+    if (keys.KeyW) mv.add(f); if (keys.KeyS) mv.sub(f);
+    if (keys.KeyA) mv.add(r); if (keys.KeyD) mv.sub(r);
+    if (mv.lengthSq()>0) mv.normalize().multiplyScalar(speed);
+    player.vel.x = mv.x; player.vel.z = mv.z;
+    /* 贴地探测：巨人悬停时 vel.y≈0，moveEntity 的 onGround 永远为 false，
+       改为直接探脚下 0.12 格内有没有实心块 */
+    const dm = player.dims();
+    let grounded = false;
+    const gy = Math.floor(player.pos.y - .12);
+    for (let gx=Math.floor(player.pos.x-dm.hw); gx<=Math.floor(player.pos.x+dm.hw) && !grounded; gx++)
+      for (let gz=Math.floor(player.pos.z-dm.hw); gz<=Math.floor(player.pos.z+dm.hw) && !grounded; gz++)
+        if (SOLID.has(getB(gx,gy,gz))) grounded = true;
+    if (grounded) lastGroundY = player.pos.y;               // 记录最近接地高度（贴地小跳不再误入平飞姿）
+    const fwdSpeed = player.vel.x*f.x + player.vel.z*f.z;   // 前向速度：只有"往前飞"才进超人姿势
+    if (player.giant){
+      /* 巨人飞行：空格升 / C 降 / W 沿视线爬升俯冲，松手悬停（无重力） */
+      player.noGravity = true;
+      const f3 = camDir();
+      let targetVy;
+      if (keys.Space) targetVy = 11;                  // 起飞/上升（任意状态可用）
+      else if (grounded) targetVy = -2;               // 贴地吸附：沿缓坡跑不飘离地面
+      else {                                           // 以下机动仅离地后生效
+        targetVy = 0;
+        if (keys.KeyC) targetVy -= 11;
+        if (keys.KeyW) targetVy += f3.y * speed;      // 抬头+W 爬升，低头+W 俯冲
+        if (keys.KeyS) targetVy -= f3.y * speed;
+      }
+      targetVy = Math.max(-13, Math.min(13, targetVy));
+      player.vel.y = THREE.MathUtils.lerp(player.vel.y, targetVy, Math.min(1, dt*(keys.Space?12:7)));  // 按空格时响应更快，起飞不肉
+      if ((keys.Space || (keys.KeyW && !grounded && Math.abs(f3.y)>.4)) && Math.random()<.06) SFX.fly();
+    } else {
+      player.noGravity = false;
+      if (keys.Space && player.onGround){ player.vel.y = 8.6; SFX.jump(); }
+    }
+    /* 巨人飞踢：朝锁定点直冲，沿途湮灭拖尾；快速踢撞怪即爆停，蓄力踢穿透怪群终点大爆炸；全程无敌 */
+    kickCd = Math.max(0, kickCd - dt);
+    punchCd = Math.max(0, punchCd - dt);
+    if (punchT > 0) punchT -= dt;
+    if (player.giant && kickT > 0){
+      kickT -= dt;
+      const kk = player.huge ? 3.2 : 1;                        // 巨大化：重心/探块/拖尾随体型放大
+      player.vel.copy(kickDir).multiplyScalar(kickSpd);
+      const kickCenter = player.pos.clone().add(new THREE.Vector3(0,2.5*kk,0));
+      kickRingT -= dt;
+      if (kickRingT <= 0){                                        // 沿途湮灭光环（静音，爆炸声留给命中）
+        kickRingT = kickCharged ? .09 : .13;
+        annihilate(player.pos.clone().add(new THREE.Vector3(0,2.2*kk,0)), kickCharged ? 0xffb02b : 0xffe08a, true);
+      }
+      if (Math.random() < (kickCharged ? 1 : .85)) poof(player.pos.clone().add(new THREE.Vector3(0,2.2*kk,0)), kickCharged ? 0xffb02b : 0x36c6ff, kickCharged ? 2 : 1);
+      let impact = false, terrainHit = false, blastAt = null;
+      for (let i=monsters.length-1;i>=0;i--){
+        const m = monsters[i];
+        if (kickHit.has(m)) continue;
+        /* 垂直胶囊命中：脚底→头顶整段都算（巨兽王实际头顶在 3.5×scale，旧版只测身体中心点，
+           锁头飞踢时玩家已飞到 14 格高而判定中心只有 3.7 格——永远打不到 mega 的根因） */
+        const kTop = m.pos.y + (m.mega ? 3.5 : 1.7) * m.parts.scl;
+        const kCy = Math.max(m.pos.y - 1, Math.min(kickCenter.y, kTop));
+        const kHitP = _v2.set(m.pos.x, kCy, m.pos.z);          // 复用临时向量（blastAt 需要克隆）
+        if (kHitP.distanceTo(kickCenter) < m.hw + 2.4){
+          kickHit.add(m);
+          annihilate(kHitP, 0xffe08a);
+          if (m.boss || m.mega) m.provoked = true;
+          m.hp -= 45; m.hurtT=.3; m.knockT = .45;
+          m.vel.addScaledVector(kickDir, 18).y = 8;
+          if (m.hp<=0) killMonster(m,i);
+          if (!kickCharged){ impact = true; blastAt = kHitP.clone(); }   // 快速踢：撞怪爆停
+        }
+      }
+      if (!impact){                                               // 撞上地形/建筑：膝/胸/头三高度探块（1格台阶可跨过）
+        const ahead = player.pos.clone().addScaledVector(kickDir, 1.7);
+        for (const oy of [1.5*kk, 3.2*kk, 4.4*kk]){
+          if (SOLID.has(getB(Math.floor(ahead.x), Math.floor(ahead.y+oy), Math.floor(ahead.z)))) { impact = terrainHit = true; break; }
+        }
+      }
+      if (!impact && kickT < 2.35                                 // 兜底：被坡体卡住（位移停滞）也算命中
+          && player.pos.distanceTo(lastKickPos) < kickSpd*dt*.25) impact = terrainHit = true;
+      lastKickPos.copy(player.pos);
+      if (terrainHit){                                            // 湮灭：轰开命中点+玩家柱体，防嵌进坡里
+        const ip = player.pos.clone().addScaledVector(kickDir, 2.2).floor();   // 打进障碍物本体（墙面上而不是墙脚前）
+        let broke = 0, bx0=1e9, bx1=-1e9, bz0=1e9, bz1=-1e9;
+        if (kickCharged){                                         // 蓄力版：大坑（半径~2.4、高5的柱洞）
+          for (let ox=-2; ox<=2; ox++) for (let oz=-2; oz<=2; oz++){
+            if (ox*ox + oz*oz > 6) continue;
+            for (let oy=-1; oy<=3; oy++){
+              const bx=ip.x+ox, by=ip.y+oy, bz=ip.z+oz;
+              if (by>=1 && SOLID.has(getB(bx,by,bz))){
+                setB(bx,by,bz,BLOCK.AIR); broke++;
+                if (bx<bx0)bx0=bx; if (bx>bx1)bx1=bx; if (bz<bz0)bz0=bz; if (bz>bz1)bz1=bz;
+              }
+            }
+          }
+        } else for (const [ox,oy,oz] of [[0,0,0],[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1],[0,2,0],[0,3,0]]){
+          const bx=ip.x+ox, by=ip.y+oy, bz=ip.z+oz;
+          if (by>=1 && SOLID.has(getB(bx,by,bz))){
+            setB(bx,by,bz,BLOCK.AIR); broke++;
+            if (bx<bx0)bx0=bx; if (bx>bx1)bx1=bx; if (bz<bz0)bz0=bz; if (bz>bz1)bz1=bz;
+          }
+        }
+        if (broke){ dirtyArea(bx0-1, bx1+1, bz0-1, bz1+1); markDirty(); }
+        player.pos.addScaledVector(kickDir, -.8);                 // 从撞击面弹出，防止嵌在方块里
+        blastAt = ip.clone().add(new THREE.Vector3(.5,.5,.5));
+      }
+      let reachStop = false;
+      if (!impact && lockPoint){                                 // 到点/越过锁定点：收势（水平越线即停，防冲过头）
+        const toLock = lockPoint.clone().sub(kickCenter);
+        if (kickCenter.distanceTo(lockPoint) < 2.6 || toLock.dot(kickDir) < 1.5){ kickT = 0; reachStop = true; }
+      }
+      if (impact || terrainHit || reachStop || kickT<=0){         // 停止：命中即范围爆炸；蓄力版到点也炸；落空=缓冲收势
+        if (kickCharged && !blastAt) blastAt = kickCenter.clone();
+        if (blastAt) kickBlast(blastAt, kickCharged);
+        player.vel.multiplyScalar(.15);
+        kickT = 0;
+        lockPoint = null; lockMark.visible = false;
+      }
+    }
+    moveEntity(player, dt, dm.hw, dm.h);
+    { /* 防嵌兜底：飞踢轰墙/复原填块/传送残留导致脚部嵌入实体时抬回地表（2次方块读取，开销可忽略） */
+      const bx = Math.floor(player.pos.x), bz = Math.floor(player.pos.z), by = Math.floor(player.pos.y);
+      if (SOLID.has(getB(bx,by,bz)) || SOLID.has(getB(bx,by+1,bz)))
+        player.pos.y = onSurfaceY(player.pos.x, player.pos.z, by+3)+.1;
+    }
+
+    /* 模型跟随 + 摆臂 + 飞行姿势 */
+    { /* 巨大化体型平滑过渡：目标3.2倍，约半秒长成 */
+      const tgt = player.giant ? (player.huge?3.2:1) : 1;
+      const gs = player.modelG.group.scale;
+      gs.setScalar(player.giant ? gs.x + (tgt-gs.x)*Math.min(1,dt*7) : 1);
+    }
+    player.group.position.copy(player.pos);
+    player.group.rotation.y = player.yaw + Math.PI;
+    const pm = player.giant?player.modelG:player.modelN;
+    const flying = player.giant && !grounded && fwdSpeed > 2.2
+      && (keys.Space || player.pos.y - lastGroundY > 2.5);          // 真升空（按空格或离地2.5格+）才平躺，贴地滑行/小跳走路
+    /* 超人飞行姿：身体放平头朝前（跟随俯仰角），双手前伸；飞踢时反向仰卧、双脚朝前 */
+    player.group.rotation.x = THREE.MathUtils.lerp(player.group.rotation.x,
+      kickT>0 ? player.pitch - Math.PI/2 : (flying ? Math.PI/2 - player.pitch : 0), Math.min(1, dt*6));
+    if (flying){
+      pm.legL.rotation.x = pm.legR.rotation.x = 0;
+      pm.armL.rotation.x = pm.armR.rotation.x = -Math.PI*.95;
+    } else {
+      const moving = mv.lengthSq()>0 && grounded;
+      const ph = moving ? now*.012 : 0;
+      const mswing = Math.sin(ph)*.7;
+      pm.legL.rotation.x = mswing; pm.legR.rotation.x = -mswing;
+      pm.armL.rotation.x = -mswing*.8; pm.armR.rotation.x = mswing*.8;
+    }
+    if (player.giant && kickT > 0){                          // 飞踢姿：双脚并拢前伸踩向目标，双臂后摆
+      pm.legR.rotation.x = pm.legL.rotation.x = -Math.PI*.92;
+      pm.armL.rotation.x = pm.armR.rotation.x = .9;
+    } else if (player.giant && punchT > 0){                  // 拳击姿：单臂猛挥 / 第三拳双臂上勾
+      const sw = Math.sin((1 - punchT/.3)*Math.PI);
+      if (punchCombo === 3){ pm.armL.rotation.x = pm.armR.rotation.x = .7 - 2.9*sw; }
+      else {
+        const A = punchArmR ? pm.armR : pm.armL, B = punchArmR ? pm.armL : pm.armR;
+        A.rotation.x = -.3 - 2.3*sw; B.rotation.x = .35;
+      }
+    } else if (player.giant && fHoldT >= 0 && fHoldT < 2){   // 蓄力姿：双臂随蓄力进度渐举
+      const ck = Math.min(1, fHoldT/2);
+      pm.armL.rotation.x = -1.9*ck; pm.armR.rotation.x = -1.9*ck;
+    } else if (beamT>0){                                    // 发射姿：右手=右臂举、左手=左臂举、双手=双臂
+      if (lastBeamHand==='right'){ pm.armR.rotation.x = -1.9; pm.armL.rotation.x = 0; }
+      else if (lastBeamHand==='left'){ pm.armL.rotation.x = -1.9; pm.armR.rotation.x = 0; }
+      else pm.armL.rotation.x = pm.armR.rotation.x = -1.9;
+    }
+    const cbF = player.giant && fHoldT >= 0 && fHoldT < 2 && started && !paused && !dead;    // F 激光蓄力
+    const cbV = player.giant && vHoldT >= 0 && vHoldT < 1.5 && started && !paused && !dead;  // V 飞踢蓄力
+    chargeBarEl.style.display = (cbF || cbV) ? 'block' : 'none';
+    if (cbF){
+      chargeFillEl.style.background = 'linear-gradient(90deg,#36c6ff,#ff2b2b)';
+      chargeFillEl.style.width = Math.min(100, fHoldT/2*100)+'%';
+    } else if (cbV){
+      chargeFillEl.style.background = 'linear-gradient(90deg,#ffe08a,#ff7b1f)';   // 金橙色=飞踢蓄力
+      chargeFillEl.style.width = Math.min(100, vHoldT/1.5*100)+'%';
+    }
+    pm.chest.material.color.setHex(player.giant ? 0x36c6ff : 0x2255aa);
+
+    /* 相机（第三人称） */
+    const dist = player.giant ? (player.huge?30:13) : 5.5;
+    const origin = player.headPos();
+    const back = camDir().clone().multiplyScalar(-dist);
+    const camPos = origin.clone().add(back).add(new THREE.Vector3(0,1.2,0));
+    camPos.y = Math.max(camPos.y, onSurfaceY(camPos.x, camPos.z, player.pos.y+2)+.4);
+    camera.position.lerp(camPos, Math.min(1, dt*14));
+    camera.lookAt(origin.clone().add(camDir().multiplyScalar(3)));
+    if (shakeAmp > .004){                                        // 震动叠加在跟随相机上，每秒衰减到千分之一
+      camera.position.x += (Math.random()-.5)*shakeAmp;
+      camera.position.y += (Math.random()-.5)*shakeAmp*.7;
+      camera.position.z += (Math.random()-.5)*shakeAmp;
+      shakeAmp *= Math.pow(.002, dt);
+    } else shakeAmp = 0;
+
+    /* 方块高亮 */
+    const hit = blockHitFrom(origin, camDir(), player.giant?7:4.6);
+    hi.visible = !!hit;
+    if (hit) hi.position.set(hit.x+.5, hit.y+.5, hit.z+.5);
+
+    /* Boss方向警报：蓄能/开火时显示指向箭头（屏幕内标头顶、屏幕外环边指向） */
+    let bdM = null;
+    for (const m of monsters) if ((m.boss||m.mega) && m.chargeT>0){ bdM = m; break; }
+    if (!bdM && eBeamT>0){
+      let best = 1e9;
+      for (const m of monsters) if (m.boss||m.mega){
+        const dd = m.pos.distanceTo(player.pos);
+        if (dd<best){ best=dd; bdM=m; }
+      }
+    }
+    if (bdM){
+      const name = bdM.mega ? '超级巨兽' : '巨型Boss';
+      const dist = bdM.pos.distanceTo(player.pos)|0;
+      bossTxtEl.textContent = eBeamT>0 && bdM.chargeT<=0 ? `💥 ${name} 光束来袭！` : `⚠ ${name} 蓄能 · ${dist}m`;
+      const head = bdM.pos.clone().add(new THREE.Vector3(0, (bdM.parts.mouthY+.25)*bdM.parts.scl, 0));
+      const rel = head.clone().applyMatrix4(camera.matrixWorldInverse);
+      let px, py, ang;
+      if (rel.z < 0){                                            // 在画面前方：直接标到头顶
+        const ndc = head.clone().project(camera);
+        px = ndc.x * innerWidth/2; py = -ndc.y * innerHeight/2;
+        if (Math.hypot(px,py) < 46){ px = 0; py = -96; }
+        ang = Math.atan2(px, -py)*180/Math.PI;
+      } else {                                                   // 在身后：按相机空间方向指向
+        ang = Math.atan2(rel.x, -rel.y)*180/Math.PI;
+        const rad = ang*Math.PI/180;
+        px = Math.sin(rad)*110; py = -Math.cos(rad)*110;
+      }
+      bossArrowEl.style.transform = `translate(${px}px,${py}px) rotate(${ang}deg) translate(-50%,-50%)`;
+      bdEl.style.display = 'block';
+    } else bdEl.style.display = 'none';
+
+    /* 昼夜 */
+    dayT += dt;
+    if (dayT >= DAY_LEN){ dayT = 0; day++; nightKills = 0; bossAggroAnnounced = false; updateClock(); flashMsg(`第 ${day} 天开始了`); }
+    const dayK = Math.sin(Math.PI * Math.min(1, Math.max(0, dayT/(DAY_LEN/2)))); // 白天0→1→0
+    const night = isNight();
+    if (night !== lastNight){                                 // 昼夜切换：入夜拍下世界快照 / 黎明复原昨夜战损
+      if (night){ if (!cleanSnap) cleanSnap = vox.slice(); }     // 首日兜底：夜里才第一次拍（正常流程在黎明时滚动刷新）
+      else dawnRestore();
+      lastNight = night;
+    }
+    /* 天空：渐变穹顶随昼夜变色，晨昏混入暖橙；太阳月亮沿天穹升落；夜晚星星浮现 */
+    const skyAng = Math.PI * dayT / (DAY_LEN/2);                // 0日出→π/2正午→π日落→夜间在地平线下
+    const duskK = Math.max(0, 1 - Math.abs(dayK - .25)/.25);
+    skyUniforms.topC.value.setRGB(.02+.17*dayK, .04+.4*dayK, .1+.9*dayK);
+    skyUniforms.botC.value.setRGB(.05+.55*dayK, .09+.72*dayK, .14+.86*dayK).lerp(DUSK_C, duskK*.5);
+    skyC.copy(skyUniforms.botC.value);                          // 雾/背景跟随地平线色，天地自然衔接
+    scene.background = skyC;
+    starMat.opacity = Math.max(0, 1 - dayK*1.7) * .9;
+    skyGroup.position.copy(camera.position);
+    SUN_DIR.set(Math.cos(skyAng), Math.sin(skyAng), .35).normalize();
+    sunDisc.position.copy(SUN_DIR).multiplyScalar(430);
+    moonDisc.position.copy(SUN_DIR).multiplyScalar(-430);
+    sunDisc.lookAt(camera.position); moonDisc.lookAt(camera.position);
+    sun.intensity = .25 + dayK*.95; hemi.intensity = .25 + dayK*.7;
+    const nightF = 1 - dayK;                                      // 夜色浓度：神殿夜灯/圣水辉光黄昏渐亮、黎明渐熄
+    for (const nl of nightLights) nl.L.intensity = nl.base * nightF;
+    for (const gm of glowMats) gm.mat.emissiveIntensity = gm.base * (.35 + .65*nightF);
+    for (const no of nightOpas) no.mat.opacity = no.base * nightF;   // 殿基光环：入夜渐显、黎明渐隐
+    for (const L of tpLinks){                                     // 传送光阵：平时微光脉动，蓄力/传送时大亮
+      const k = (tpLink === L ? Math.min(1, tpCharge/TP_TIME) : 0) + L.flash;
+      for (const bm of L.beamMats) bm.mat.opacity = Math.min(.9, bm.base + k*.45 + Math.sin(now*.003)*.02);
+      for (const rm of L.ringMats) rm.mat.opacity = Math.min(.85, rm.base + k*.5);
+      if (L.flash > 0) L.flash = Math.max(0, L.flash - dt*1.1);
+    }
+    sun.position.copy(SUN_DIR).multiplyScalar(140).add(player.pos);   // 光照方向跟随太阳（早晚会拉出长影面）
+
+    /* 水下视觉：浓雾蓝调；上界高空：暖亮薄雾；地面：天空雾 */
+    if (camera.position.y < WATER + .55){
+      scene.fog.color.setHex(0x18578c); scene.fog.near = 2; scene.fog.far = 22;
+    } else if (camera.position.y > HEAVEN_Y-18){
+      scene.fog.color.copy(skyC).lerp(HEAVEN_FOG, .5); scene.fog.near = 120; scene.fog.far = 320;
+    } else {
+      scene.fog.color.copy(skyC); scene.fog.near = 90; scene.fog.far = 240;
+    }
+
+    /* 圣域庇护：玩家在神殿周围或殿内时，怪兽不敢靠近攻击 */
+    const pSanct = inSanctuary(player.pos.x, player.pos.z);
+    sanctTipEl.style.display = pSanct ? 'block' : 'none';
+
+    /* 传送阵：站上神殿光阵蓄力 2 秒 → 天地两界同址互传（到达阵需踏出再触发，防乒乓） */
+    let onTp = null;
+    for (const L of tpLinks){
+      if (Math.abs(player.pos.x-(L.x+.5))>1.8 || Math.abs(player.pos.z-(L.z+.5))>1.8) continue;
+      if (Math.abs(player.pos.y-(L.gh+2))<2.4 || Math.abs(player.pos.y-(L.hy+2))<2.4){ onTp = L; break; }
+    }
+    const locked = onTp && onTp === tpLockL;
+    if (onTp && !locked){
+      if (tpLink !== onTp){ tpLink = onTp; tpCharge = 0; }
+      tpCharge += dt;
+      chargeBarEl.style.display = 'block';
+      chargeFillEl.style.width = Math.min(100, tpCharge/TP_TIME*100)+'%';
+      chargeFillEl.style.background = 'linear-gradient(90deg,#66e8ff,#d8f6ff)';
+      if (tpCharge >= TP_TIME){
+        doTeleport(onTp); tpCharge = 0; tpLink = null;
+        chargeBarEl.style.display = 'none'; chargeFillEl.style.background='';
+      }
+    } else {
+      if (tpLink){ tpCharge = 0; tpLink = null; chargeBarEl.style.display = 'none'; chargeFillEl.style.background=''; }
+      if (!onTp) tpLockL = null;                                 // 离开所有光阵 → 重新武装
+    }
+
+    /* 怪兽生成与AI */
+    if (night){
+      spawnCd -= dt;
+      const megaNight = day%5===0;
+      // 巨兽夜：小怪减员 65%，让舞台留给超级巨兽（少而精）
+      const cap = Math.max(2, Math.round((MAX_MON + Math.min(6, day-1)) * (megaNight?.35:1)));
+      if (spawnCd<=0 && monsters.filter(m=>!m.boss).length < cap){
+        spawnMonster('normal'); spawnCd = Math.max(1.4, 4 - day*.25) * (megaNight?2.2:1);
+      }
+      // 每夜必有 Boss 级巨兽：普通夜随机（紫Boss/翼龙/魔像），第 5 夜巨兽王替场（单只）
+      if (!monsters.some(m=>m.boss || m.mega) && dayT < DAY_LEN/2 + 25){
+        const watched = nightKills < BOSS_AGGRO_KILLS;
+        if (megaNight){ spawnMonster('mega'); SFX.boss(); flashMsg('👹 巨兽王式超级巨兽降临！！（300血 · 只要你不攻击它，它就不会动手）'); }
+        else {
+          const roll = Math.random();
+          const bt = roll<.5 ? 'boss' : roll<.8 ? 'wyvern' : 'golem';
+          spawnMonster(bt); SFX.boss();
+          const nm = bt==='boss' ? '巨型Boss' : bt==='wyvern' ? '🦅 空中霸主翼龙' : '🗿 岩石魔像';
+          flashMsg(nm+' 降临！'+(watched ? '正在暗处监视你…（击败小怪提升警戒）' : '已注意到你！'));
+        }
+      }
+    }
+    const bossAggro = nightKills >= BOSS_AGGRO_KILLS;          // 警戒满→Boss级参战围殴
+    if (night && !bossAggroAnnounced && bossAggro && monsters.some(m=>m.boss && !m.mega)){
+      bossAggroAnnounced = true; SFX.boss(); flashMsg('‼ 警戒满！Boss 级巨兽盯上你了！！');
+    }
+    for (let i=monsters.length-1;i>=0;i--){
+      const m = monsters[i];
+      const toP = _v1.copy(player.pos).sub(m.pos); toP.y=0;      // 复用临时向量（每帧×每怪 clone 是 GC 压力源）
+      const d = toP.length();
+      if (d>.1) toP.normalize();
+      const mAggro = m.mega ? !!m.provoked : (m.boss ? (bossAggro || !!m.provoked) : bossAggro);
+                                                                   // 巨兽王：纯被动、被打才反击；其余Boss：警戒满或被打都反击
+      if ((m.boss||m.mega) && !mAggro){                       // Boss 未警戒：原地漫游"监视"
+        m.wanderT = (m.wanderT||0) - dt;
+        if (m.wanderT <= 0){ m.wanderT = 2+Math.random()*3; m.wHeading = Math.random()*Math.PI*2; }
+        m.vel.x = Math.sin(m.wHeading)*m.speed*.35; m.vel.z = Math.cos(m.wHeading)*m.speed*.35;
+        if (m.fly) m.vel.y = 0;
+        m.parts.group.rotation.y = m.wHeading;
+      } else if (m.knockT > 0){                                 // 被飞踢击退中：保留击退速度（飞行怪也一样）
+        m.knockT -= dt;
+        if (pSanct){                                            // 圣域庇护：击退位移不许有指向神殿的分量（防连击把怪推入圣域）
+          const dxs = m.pos.x-pSanct.x, dzs = m.pos.z-pSanct.z;
+          const n = Math.hypot(dxs, dzs)||.001;
+          const comp = m.vel.x*(-dxs/n) + m.vel.z*(-dzs/n);     // 朝殿心的速度分量
+          if (comp > 0){ m.vel.x += comp*dxs/n; m.vel.z += comp*dzs/n; }
+        }
+      } else if (m.fly){                                             // 飞行怪（飞翼兽/翼龙）：悬浮逼近 + 起伏
+        const wob = Math.sin(now*.0016+m.walk);
+        const alt = player.giant ? m.flyAlt : m.flyAlt*.6;
+        const orbR = m.flyAlt>5 ? 6 : 3;
+        const tgt = new THREE.Vector3(player.pos.x + wob*orbR, player.pos.y + alt + Math.sin(now*.002+m.walk)*1.1, player.pos.z + Math.cos(now*.0013+m.walk)*orbR);
+        const toT = tgt.sub(m.pos), dd = toT.length();
+        if (dd>.5){ toT.multiplyScalar(m.speed*1.5/dd); m.vel.copy(toT); } else m.vel.set(0,0,0);
+        const surf = onSurfaceY(m.pos.x, m.pos.z, m.pos.y+4);
+        if (m.pos.y < surf+1.2) m.vel.y = Math.max(m.vel.y, 2.5);
+        m.parts.group.rotation.y = Math.atan2(m.vel.x, m.vel.z)||0;
+      } else if (d > (player.giant?4:1.6)){
+        m.vel.x = toP.x*m.speed; m.vel.z = toP.z*m.speed;
+        m.parts.group.rotation.y = Math.atan2(toP.x, toP.z);
+      } else { m.vel.x=m.vel.z=0; }
+      if (pSanct && !(m.knockT > 0)){                           // 圣域庇护：怪兽被圣光拦在神殿边界外（knockT 未定义=从未被踢飞）
+        const dxs = m.pos.x-pSanct.x, dzs = m.pos.z-pSanct.z;
+        const dS = Math.hypot(dxs, dzs)||.001;
+        if (dS < pSanct.r){                                     // 已闯入圣域：转身退出
+          m.vel.x = dxs/dS*m.speed*.9; m.vel.z = dzs/dS*m.speed*.9;
+          if (m.fly){ m.vel.x = m.vel.z = 0; m.vel.y = Math.max(m.vel.y, 1.2); }
+          m.parts.group.rotation.y = Math.atan2(dxs, dzs);
+        } else if (dS < pSanct.r+3){ m.vel.x = m.vel.z = 0; }   // 边界驻足：不敢再进一步
+      }
+      moveEntity(m, dt, m.hw, m.h);
+      m.parts.group.position.copy(m.pos);
+      const mw = Math.sin(now*.011 + m.walk)*.5;
+      m.parts.legL.rotation.x = mw; m.parts.legR.rotation.x = -mw;
+      m.parts.armL.rotation.x = -mw*.6; m.parts.armR.rotation.x = mw*.6;
+      if (m.parts.tail) m.parts.tail.rotation.y = Math.sin(now*.003 + m.walk)*.3;   // 尾巴左右摇摆
+      if (m.atkAnim > 0){                                     // 近战抡砸动画：双臂抡起下劈
+        m.atkAnim -= dt;
+        const sw = Math.sin((1 - Math.max(0,m.atkAnim)/.45)*Math.PI);
+        m.parts.armL.rotation.x = m.parts.armR.rotation.x = .5 - 2.4*sw;
+      }
+      if (m.parts.wL){                                        // 飞翼兽扑翼
+        const fw = Math.sin(now*.018+m.walk)*.85;
+        m.parts.wL.rotation.z = fw; m.parts.wR.rotation.z = -fw;
+      }
+      /* Boss/超级巨兽远程光束：蓄能0.5s（可走位）→ 开火；有视线才充能；未警戒/未被激怒不放 */
+      if ((m.boss||m.mega) && !dead && mAggro && !pSanct){
+        m.eCd -= dt;
+        const eyePos = m.pos.clone().add(new THREE.Vector3(0, (m.parts.mouthY+.2)*m.parts.scl, 0));
+        if (m.chargeT>0){
+          m.chargeT -= dt;
+          const pulse = Math.sin(now*.04)>0 ? 0xffffff : 0xff6060;
+          for (const em of m.parts.eyeMats) em.emissive.setHex(pulse);
+          if (m.chargeT<=0){ enemyBeamFire(m); m.eCd = (m.mega?4.2:3.6)+Math.random()*1.4; }
+        } else {
+          for (const em of m.parts.eyeMats) em.emissive.setHex(m.parts.eyeHex);
+          if (m.eCd<=0 && d>7 && d<40){
+            const toEye = player.headPos().clone().sub(eyePos);
+            const dist3 = toEye.length();
+            const block = voxelRay(eyePos, toEye.normalize(), dist3);
+            if (!block || block.dist >= dist3-.5){ m.chargeT = player.giant ? .95 : .5; SFX.echarge(); }   // 对巨人蓄能更久=可闪避窗口
+            else m.eCd = .8;                                  // 被掩体挡住，稍后再试
+          }
+          if (m.mega && m.eCd>1.2){                           // 巨兽王另有火球（飞行投射物·可闪避）
+            m.fbCd = (m.fbCd===undefined ? 2 : m.fbCd) - dt;
+            if (m.fbCd<=0 && d>5 && d<45){ spitFireball(m); m.fbCd = 3.2+Math.random()*1.6; }
+          }
+        }
+      }
+      const emState = m.hurtT>0 ? 1 : 0;                       // 受击红/常态底光只在切换时刷一遍（此前每帧全子件 setHex）
+      if (emState !== m._emState){
+        m._emState = emState;
+        const em = emState ? 0x881111 : (m.mega?0x330008:m.boss?0x220033:0x000000);
+        m.parts.group.children.forEach(c=>c.material && c.material.emissive && !c.material.__keepGlow && c.material.emissive.setHex(em));
+      }
+      if (m.hurtT>0) m.hurtT-=dt;
+      if (m.hp !== m.barHp){
+        if (m.hp < m.barHp && now - lastHitSfxT > 120){ SFX.hit(); lastHitSfxT = now; }   // 命中音中央钩子：激光/炮弹/飞踢/挥拳打中都有打击反馈（节流防重叠）
+        m.barHp = m.hp; drawHpBar(m.bar, m.hp, m.maxHp, m.boss||m.mega);
+      }
+      /* 近战攻击：小怪挠巨人只掉1血、击退也弱（巨人不被小怪海推来推去） */
+      m.atkCd -= dt;
+      const reach = 1.5 + m.hw + (player.giant?1.2:0);
+      if (d < reach && m.atkCd<=0 && kickT<=0 && Math.abs(player.pos.y-m.pos.y) < (m.fly?4.5:3)
+          && (!(m.boss||m.mega) || mAggro) && !pSanct){
+        m.atkCd = 1.1; m.atkAnim = .45;                       // 抡砸动画与伤害同步
+        const big = m.boss||m.mega;
+        const mdmg = big ? m.dmg : (player.giant ? 1 : m.dmg);
+        player.hp -= mdmg; updateHUD(); damageFeedback(mdmg); SFX.hurt();
+        player.vel.add(toP.clone().multiplyScalar(big?6:(player.giant?1.6:6))).y = big?5:2.5;
+        flashEl.textContent='';
+        if (player.hp<=0){ die(); }
+      }
+      /* 白天烧没 */
+      if (!night && dayT>2){ killQuiet(m,i); continue; }
+    }
+
+    /* 动物 & 上界异兽 */
+    faunaTick(dt, now);
+
+    /* 白天回血 */
+    if (!isNight() && player.hp<player.maxHp && Math.floor(now/1000)!==Math.floor((now-dt*1000)/1000)){
+      player.hp = Math.min(player.maxHp, player.hp+1); updateHUD();
+    }
+  }
+
+  /* 机枪连发 */
+  if (started && !paused && !dead && firing && gunMode){
+    gunCd -= dt;
+    if (gunCd <= 0){ gunCd = GUN_RATE; shoot(); }
+  } else gunCd = 0;
+
+  /* 巨人长按F：双手举起蓄力 2 秒 → 双手持续激光（松开中断）；点按F已在 keydown 即发单手 */
+  if (started && !paused && !dead && player.giant && fHoldT >= 0){
+    fHoldT += dt;
+    if (fHoldT < 2){
+      if ((fHoldT*10|0) !== ((fHoldT-dt)*10|0) && Math.random()<.7){   // 蓄力火花
+        const dirC = camDir();
+        const rightC = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
+        const hp1 = player.headPos().addScaledVector(rightC, 1.4).addScaledVector(dirC, 1.1).add(new THREE.Vector3(0,-2,0));
+        poof(hp1, 0x36c6ff, 2);
+      }
+      channelT = .45;
+    } else {
+      channelT -= dt;
+      beamLoopStart();                                        // 持续发射阶段：连续激光循环音
+      if (channelT <= 0){ channelT = .45; fireBeam('both'); }
+    }
+  } else { fHoldT = -1; channelT = .45; beamLoopStop(); }
+
+  /* 巨人长按V：蓄力1.5秒自动起脚蓄力飞踢（穿透+范围大爆炸）；提前松开已在 keyup 触发快速踢 */
+  if (started && !paused && !dead && player.giant && vHoldT >= 0){
+    vHoldT += dt;
+    if ((vHoldT*12|0) !== ((vHoldT-dt)*12|0)){                    // 蓄力金光火花
+      const dirC = camDir();
+      poof(player.pos.clone().addScaledVector(dirC, 1.2).add(new THREE.Vector3(0,1.4,0)), 0xffe08a, 2);
+    }
+    if (vHoldT >= 1.5){ vHoldT = -1; tryKick(true); }
+  } else if (!player.giant || dead || paused) vHoldT = -1;
+
+  /* 曳光弹淡出 */
+  for (let i=tracers.length-1;i>=0;i--){
+    const tr = tracers[i]; tr.t -= dt;
+    tr.line.material.opacity = Math.max(0, tr.t/.09);
+    if (tr.t<=0){ scene.remove(tr.line); tr.line.geometry.dispose(); tr.line.material.dispose(); tracers.splice(i,1); }
+  }
+
+  /* 锁定标记：旋转脉动 */
+  if (lockMark.visible){
+    lockMark.rotation.y += dt*2.2;
+    lockMark.rotation.x = Math.sin(now*.004)*.3;
+    lockMark.scale.setScalar(1 + Math.sin(now*.008)*.15);
+  }
+
+  /* 变身特效：光柱冲天 + 光球环绕（跟随玩家，越转越快，随时间淡出） */
+  if (transFx.t > 0){
+    transFx.t -= dt;
+    const k = Math.max(0, Math.min(1, transFx.t/2.8));
+    if (transFx.pillar){
+      transFx.pillar.position.set(player.pos.x, player.pos.y+16, player.pos.z);
+      const pu = 1 + Math.sin(now*.02)*.15;
+      transFx.pillar.scale.set(pu*(1+(1-k)*.6), 1, pu*(1+(1-k)*.6));
+      transFx.pillar.material.opacity = .55*k;
+    }
+    if (transFx.light){
+      transFx.light.position.set(player.pos.x, player.pos.y+3, player.pos.z);
+      transFx.light.intensity = 5*k;
+    }
+    const spinUp = 1 + (2.8-Math.max(0,transFx.t))*1.2;          // 越转越快
+    for (const o of transFx.orbs){
+      o.ph += dt * o.spd * spinUp;
+      o.mesh.position.set(
+        player.pos.x + Math.cos(o.ph)*o.r,
+        player.pos.y + o.h + Math.sin(now*.004 + o.ph*2)*.4,     // 上下起伏
+        player.pos.z + Math.sin(o.ph)*o.r);
+      o.mesh.material.opacity = .95*k;
+      o.mesh.scale.setScalar(.55 + k*.75);
+    }
+    if (transFx.t <= 0) stopTransformFx();
+  }
+
+  /* 怪兽降临：闪电闪烁淡出 + 乌云淡入盘旋淡出 */
+  for (let i=bolts.length-1;i>=0;i--){
+    const b = bolts[i]; b.t -= dt;
+    const k = Math.max(0, b.t/.4);
+    b.line.material.opacity = k * (Math.random()<.25 ? .35 : 1);   // 随机闪烁
+    b.light.intensity = 5*k;
+    if (b.t<=0){
+      scene.remove(b.line); b.line.geometry.dispose(); b.line.material.dispose();
+      releaseLight(b.pit); bolts.splice(i,1);
+    }
+  }
+  for (let i=stormCloudsArr.length-1;i>=0;i--){
+    const c = stormCloudsArr[i]; c.t -= dt;
+    c.g.rotation.y += dt*.4;
+    const op = .85 * Math.min(Math.min(1, (5.5-c.t)/.8), Math.min(1, Math.max(0,c.t)/1.2));   // 前0.8s淡入、末1.2s淡出
+    for (const puff of c.g.children) puff.material.opacity = op;
+    if (c.t<=0){
+      scene.remove(c.g);
+      c.g.children.forEach(p=>{ p.geometry.dispose(); p.material.dispose(); });
+      stormCloudsArr.splice(i,1);
+    }
+  }
+
+  /* 水面起伏 + 云团漂移起伏（双层云带） */
+  water.position.y = WATER + .55 + Math.sin(now*.0012)*.08;
+  for (const c of clouds){
+    c.position.x += c.userData.spd * dt;
+    c.position.y = c.userData.baseY + Math.sin(now*.0004 + c.userData.ph)*1.2;
+    if (c.position.x > WORLD+24) c.position.x = -24;
+  }
+  for (const fx of fallFx)                                       // 瀑布水雾缓动漂浮
+    for (const m of fx.mists)
+      m.position.y = m.userData.baseY + Math.sin(now*.0008*m.userData.spd + m.userData.ph)*.55;
+
+  /* 粒子 */
+  for (let i=puffs.length-1;i>=0;i--){
+    const p = puffs[i]; p.t -= dt;
+    p.mesh.userData.v.y -= 12*dt;
+    p.mesh.position.addScaledVector(p.mesh.userData.v, dt);
+    p.mesh.rotation.x += dt*5; p.mesh.rotation.y += dt*5;
+    p.mesh.scale.setScalar(Math.max(.01, p.t*(p.mesh.userData.sz||1)));     // 碎片带独立尺寸（burst 用）
+    if (p.t<=0){ scene.remove(p.mesh); puffs.splice(i,1); }      // 几何体/材质是共享的，不 dispose
+  }
+
+  /* 湮灭环：池化网格扩散消散（到期只标记 free，不销毁） */
+  updateLightPool(dt);
+  for (let i=rings.length-1;i>=0;i--){
+    const rg = rings[i]; rg.t -= dt;
+    rg.mesh.scale.setScalar(1 + (rg.dur-rg.t)*rg.grow);
+    rg.mesh.material.opacity = Math.max(0, rg.t/rg.dur*rg.op);
+    if (rg.t<=0){
+      rg.mesh.visible = false; rg.mesh.material.opacity = 0;
+      rg.item.free = true; rings.splice(i,1);
+    }
+  }
+
+  /* 巨兽王火球飞行 + 能量炮弹飞行 */
+  if (started && !paused && !dead) updateFireballs(dt);
+  if (started && !paused && !dead) updateEnergyBalls(dt);
+  if (beamT>0){
+    beamT -= dt;
+    const pulse = (1 + Math.sin(now*.045)*.18) * beamThick;   // 光柱呼吸脉冲（保持红色粗激光的粗度）
+    beamCore.scale.x = beamCore.scale.z = pulse;
+    beamGlow.scale.x = beamGlow.scale.z = pulse;
+    beamCore.material.opacity = Math.min(.95, beamT*2.2);
+    beamGlow.material.opacity = Math.min(.45, beamT*1.6);
+    beamLight.intensity = Math.max(0, beamT*9);
+    if (beamT<=0){ beamCore.visible = beamGlow.visible = false; beamLight.intensity = 0; }
+  }
+  if (eBeamT>0){                                   // 敌方光束淡出
+    eBeamT -= dt;
+    const pu = 1 + Math.sin(now*.05)*.25;
+    eBeamCore.scale.x = eBeamCore.scale.z = pu;
+    eBeamGlow.scale.x = eBeamGlow.scale.z = pu;
+    eBeamCore.material.opacity = Math.max(0, eBeamT*3);
+    eBeamGlow.material.opacity = Math.max(0, eBeamT*2);
+    eBeamLight.intensity = Math.max(0, eBeamT*8);
+    if (eBeamT<=0){ eBeamCore.visible = eBeamGlow.visible = false; eBeamLight.intensity = 0; }
+  }
+  if (flashT>0){ flashT-=dt; if (flashT<=0) flashEl.textContent=''; }
+
+  /* 区块重建泵（每帧≤2块）+ 视锥/距离裁剪 */
+  pumpChunks();
+  updateChunkVisibility();
+
+  /* 尺寸 & 渲染 */
+  const w = innerWidth, h = innerHeight;
+  if (canvas.width !== w*renderer.getPixelRatio()|0){ renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+  renderer.render(scene, camera);
+}
+function killQuiet(m,i){ scene.remove(m.parts.group); disposeGroup(m.parts.group); m.bar.tex.dispose(); m.bar.sp.material.dispose(); monsters.splice(i,1); }
+function gainEnergy(n){
+  player.energy = Math.min(ENERGY_MAX, player.energy+n);   // 巨人状态下击败怪兽也照常充能
+  if (player.energy>=ENERGY_MAX && !player.giant) flashMsg('⚡ 能量已满，按 T 变身光之巨人！');
+  updateHUD();
+}
+requestAnimationFrame(frame);
+
+/* 首次进入提示存档 */
+if (loaded) flashMsg('已读取上次的世界存档');
+
+/* 调试接口：自动化测试/排查用，不影响正常游戏 */
+window.__game = { player, monsters, fauna, chunks, spawnMonster, spawnFauna, shoot, fireBeam, tryTransform, toggleGun, killMonster, killFauna, ray, camera, getB, setB, onSurfaceY, SOLID, PLANTS, WORLD, HEIGHT, HEAVEN_Y, scene,
+  setDay:(d,t)=>{ day=d; dayT=t; updateClock(); }, save,
+  dig:(x,y,z)=>{ const o=getB(x,y,z); setB(x,y,z,0); dirtyBlock(x,y,z); return o; },
+  heal:()=>({snap:!!cleanSnap, healed:dawnHealed, night:lastNight}),
+  playerPlaced,
+  sanctuaries, nightLights, tpLinks,
+  getTp:()=>({charge:+tpCharge.toFixed(2), on:!!tpLink, n:tpLinks.length}),
+  setPaused:v=>{ paused=v; document.getElementById('pauseTip').style.display=v?'block':'none'; },
+  pressF:v=>{ if(v){ beamSide*=-1; fireEnergyBall(beamSide>0?'right':'left'); fHoldT=0; channelT=.45; SFX.charge(); } else fHoldT=-1; },
+  pressV:(c)=>tryKick(!!c),
+  pressR:()=>tryPunch(),
+  toggleHuge,
+  getPunch:()=>({t:punchT, combo:punchCombo, cd:punchCd, huge:player.huge, scale:player.modelG.group.scale.x, dimsH:player.dims().h}),
+  pressL:()=>lockTarget(),
+  getKick:()=>({ t:kickT, cd:kickCd, charged:kickCharged, dir:kickDir.toArray(), lock:lockPoint?lockPoint.toArray():null, mark:lockMark.visible }),
+  loopOn:()=>!!beamLoopNodes,
+  getBeam:()=>({ glow:'#'+beamGlow.material.color.getHexString(), thick:beamThick, rings:rings.length, balls:energyBalls.length }),
+  energyBalls,
+  fx:()=>({ t:transFx.t, orbs:transFx.orbs.length, pillar:!!transFx.pillar, flash:transFlashEl.style.opacity }),
+  storm:()=>({ bolts:bolts.length, clouds:stormCloudsArr.length }),
+  info:()=>({ calls:renderer.info.render.calls, tris:renderer.info.render.triangles }),
+  fireballs,
+  THREE_VEC:(x,y,z)=>new THREE.Vector3(x,y,z) };
+})();
+</script>
+</body>
+</html>
